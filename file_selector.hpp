@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -20,9 +21,11 @@
 #include <windows.h>
 #endif
 
+#include <fmt/chrono.h>
 #include <fmt/color.h>
 #include <fmt/core.h>
 #include <fmt/ostream.h>
+
 namespace fs = std::filesystem;
 
 class FileSelector {
@@ -31,7 +34,7 @@ public:
     FileSelector(const std::string &start, const std::vector<std::string> &exts)
         : currentPath(expandTilde(fs::canonical(start))), lastPath(currentPath),
           filters(exts), cursor(0),
-          commandMode(false), showHelp(true) {}
+          showHelp(true) {}
 #elif defined(_WIN32)
     FileSelector(const std::string &start = ".", const std::vector<std::string> &exts = {})
         : currentPath(fs::canonical(start)),
@@ -58,7 +61,6 @@ private:
     size_t cursor;
     std::set<fs::path> selectedPaths;
     termios originalTermios{};
-    bool commandMode;
     bool showHelp;
     bool inRangeMode;
     bool openFolderinRange;
@@ -66,8 +68,9 @@ private:
     bool showHidden = false;
     bool shouldQuit = false;
     std::string commandBuffer;
-    std::string sortPolicy = "dir,name";
+    std::string sortPolicy = "type,name";
     bool sortPolicyChanged = true;
+    bool filtersChanged = false;
 
     std::vector<std::string> linuxRun() {
         setupTerminal();
@@ -135,13 +138,16 @@ private:
         if (filters.empty())
             return true;
         std::string ext = p.extension().string();
+        if (!ext.empty()) {
+            ext = ext.substr(1);
+        }
         return std::find(filters.begin(), filters.end(), ext) != filters.end();
     }
 
     // Entry processing
     void refreshEntries() {
         bool dirChanged{lastPath != currentPath};
-        if (sortPolicyChanged or dirChanged) {
+        if (sortPolicyChanged or dirChanged or filtersChanged) {
             if (dirChanged) {
                 lastPath = currentPath;
             }
@@ -166,7 +172,7 @@ private:
 
                 entrySort();
                 sortPolicyChanged = false;
-                dirChanged = false;
+                filtersChanged = true;
 
             } catch (...) {
             }
@@ -257,16 +263,19 @@ private:
         - 'H': toggle hidden files
     */
     void processInput() {
-        char key = readKey();
-        auto is_colon = [](char c) { return c == ':'; };
-        auto is_positive_digit = [](char c) { return c >= '1' && c <= '9'; };
+        int key = readKey();
+        auto is_colon = [](int c) { return c == ':'; };
+        auto is_positive_digit = [](int c) { return c >= '1' && c <= '9'; };
 
         if (is_colon(key)) { // Command mode
             setTerminalInputMode();
             fmt::print(fmt::emphasis::bold | fmt::fg(fmt::color::steel_blue),
-                       "Command {}", key);
-            std::getline(std::cin, commandBuffer);
-            commandBuffer = key + commandBuffer;
+                       "Command {}", static_cast<char>(key));
+            std::cout.flush();
+
+            commandBuffer = getlineByChar();
+
+            commandBuffer = static_cast<char>(key) + commandBuffer;
             handleColonCommand();
             setTerminalRawMode();
             (false);
@@ -276,8 +285,10 @@ private:
             fmt::print(fmt::emphasis::bold | fmt::fg(fmt::color::steel_blue),
                        "Number ");
             fmt::print("{}", key);
+
             std::getline(std::cin, commandBuffer);
-            commandBuffer = key + commandBuffer;
+
+            commandBuffer = static_cast<char>(key) + commandBuffer;
             handleSelectionCommand();
             setTerminalRawMode();
             (false);
@@ -286,35 +297,244 @@ private:
         }
     }
 
-    char readKey() {
-        char c;
-        read(STDIN_FILENO, &c, 1);
-        return c;
+    std::string getlineByChar() {
+        setupTerminal();
+        std::string buffer;
+        size_t cursor_pos = 0;
+        auto moveCmdCursorRight = [&]() {
+            std::cout << buffer[cursor_pos] << std::flush;
+            ++cursor_pos;
+        };
+        auto moveCmdCursorLeft = [&]() {
+            --cursor_pos;
+            std::cout << "\b" << std::flush;
+        };
+        auto deleteChar = [&]() {
+            buffer.erase(cursor_pos - 1, 1);
+            --cursor_pos;
+            std::cout << "\b\033[s" << buffer.substr(cursor_pos) << ' ' << "\033[u" << std::flush;
+        };
+        auto deleteCharBack = [&]() {
+            buffer.erase(cursor_pos, 1);
+            std::cout << "\033[s"; // save cursor pos
+            std::cout << buffer.substr(cursor_pos) << ' ';
+            std::cout << "\033[u" << std::flush; // restore cursor pos
+        };
+
+        int ch;
+        while (true) {
+            size_t buffer_size = buffer.size();
+            ch = readKey();
+
+            switch (ch) {
+            case KEY_ESC:
+                return "";
+                break;
+            case KEY_ARROW_LEFT:
+                if (cursor_pos > 0) {
+                    moveCmdCursorLeft();
+                } else {
+                    std::cout << "\a" << std::flush;
+                }
+                break;
+            case KEY_ARROW_RIGHT:
+                if (cursor_pos < buffer_size) {
+                    moveCmdCursorRight();
+                } else {
+                    std::cout << "\a" << std::flush;
+                }
+                break;
+            case KEY_CTRL_LEFT:
+                if (cursor_pos > 0) {
+                    moveCmdCursorLeft();
+                }
+                while (cursor_pos > 0 && isspace(buffer[cursor_pos])) {
+                    moveCmdCursorLeft();
+                }
+                while (cursor_pos > 0 && !isspace(buffer[cursor_pos - 1])) {
+                    moveCmdCursorLeft();
+                }
+                break;
+            case KEY_CTRL_RIGHT:
+                while (cursor_pos < buffer_size && isspace(buffer[cursor_pos])) {
+                    moveCmdCursorRight();
+                }
+                while (cursor_pos < buffer_size && !isspace(buffer[cursor_pos])) {
+                    moveCmdCursorRight();
+                }
+                break;
+            case KEY_HOME:
+                while (cursor_pos > 0) {
+                    moveCmdCursorLeft();
+                }
+                break;
+            case KEY_END:
+                while (cursor_pos < buffer_size) {
+                    moveCmdCursorRight();
+                }
+                break;
+            case KEY_DELETE:
+                if (cursor_pos < buffer_size) {
+                    buffer.erase(cursor_pos, 1);
+                    std::cout << "\033[s"; // save cursor pos
+                    std::cout << buffer.substr(cursor_pos) << ' ';
+                    std::cout << "\033[u" << std::flush; // restore cursor pos
+                }
+                break;
+            case KEY_BACKSPACE:
+                if (cursor_pos > 0) {
+                    deleteChar();
+                } else {
+                    std::cout << "\a" << std::flush;
+                }
+                break;
+            case KEY_DELETE_WORD:
+                if (cursor_pos > 0) {
+                    deleteChar();
+                }
+                while (cursor_pos > 0 && isspace(buffer[cursor_pos])) {
+                    deleteChar();
+                }
+                while (cursor_pos > 0 && !isspace(buffer[cursor_pos - 1])) {
+                    deleteChar();
+                }
+                break;
+            case KEY_DELETE_WORD_BACK:
+                while (cursor_pos < buffer_size && isspace(buffer[cursor_pos])) {
+                    deleteCharBack();
+                }
+                while (cursor_pos < buffer_size && !isspace(buffer[cursor_pos])) {
+                    deleteCharBack();
+                }
+                break;
+            case KEY_DELETE_LINE:
+                while (cursor_pos > 0) {
+                    deleteChar();
+                }
+                break;
+            case KEY_ENTER:
+                std::cout << "\n";
+                break;
+            default:
+                if (std::isprint(ch)) {
+                    buffer.insert(cursor_pos, 1, static_cast<char>(ch));
+                    std::cout << "\033[s" << buffer.substr(cursor_pos) << "\033[u" << static_cast<char>(ch) << std::flush;
+                    ++cursor_pos;
+                }
+            }
+        }
+        restoreTerminal();
+        return buffer;
     }
 
-    void handleNormalInput(char key) {
+    enum Key {
+        KEY_NULL = 0,
+        KEY_ESC = 27,
+        KEY_ENTER = '\r',
+        KEY_BACKSPACE = 127,
+
+        KEY_ARROW_LEFT = 1000,
+        KEY_ARROW_RIGHT,
+        KEY_ARROW_UP,
+        KEY_ARROW_DOWN,
+        KEY_HOME,
+        KEY_END,
+        KEY_CTRL_LEFT,
+        KEY_CTRL_RIGHT,
+
+        KEY_DELETE,
+        KEY_DELETE_WORD,
+        KEY_DELETE_WORD_BACK,
+        KEY_DELETE_LINE
+        // Add more as needed
+    };
+
+    int readKey() {
+        char seq[10]{};
+        char readedLength = read(STDIN_FILENO, &seq[0], 10);
+        if (readedLength != 1) {
+            if (readedLength == 2) {
+                switch (seq[1]) {
+                case '\177':
+                    return KEY_DELETE_WORD;
+                case 'd':
+                    return KEY_DELETE_WORD_BACK;
+                }
+            }
+            if (readedLength == 3) {
+                if (seq[1] == '[') {
+                    switch (seq[2]) {
+                    case 'A':
+                        return KEY_ARROW_UP;
+                    case 'B':
+                        return KEY_ARROW_DOWN;
+                    case 'C':
+                        return KEY_ARROW_RIGHT;
+                    case 'D':
+                        return KEY_ARROW_LEFT;
+                    case 'H':
+                        return KEY_HOME;
+                    case 'F':
+                        return KEY_END;
+                    }
+                }
+            } else if (readedLength == 4) {
+                switch (seq[2]) {
+                case '3':
+                    switch (seq[3]) {
+                    case '~':
+                        return KEY_DELETE;
+                    }
+                }
+            } else if (readedLength == 6) {
+                switch (seq[5]) {
+                case 'C':
+                    return KEY_CTRL_RIGHT;
+                case 'D':
+                    return KEY_CTRL_LEFT;
+                }
+            }
+            return KEY_NULL;
+        } else {
+            switch (seq[0]) {
+            case '\x1B':
+                return KEY_ESC;
+            case '\n':
+            case '\r':
+                return KEY_ENTER;
+            case 23:
+                return KEY_DELETE_WORD;
+            case 21:
+                return KEY_DELETE_LINE;
+            default:
+                return seq[0]; // Normal character
+                break;
+            }
+        }
+
+        return KEY_ESC;
+    }
+
+    void handleNormalInput(int key) {
         switch (key) {
         case 27: // Escape key
-            read(STDIN_FILENO, &key, 1);
-            if (key == 91) { // Arrow keys
-                read(STDIN_FILENO, &key, 1);
-                switch (key) {
-                case 'A':
-                    moveCursor(-1);
-                    break;
-                case 'B':
-                    moveCursor(1);
-                    break;
-                case 'C':
-                    navigateParent();
-                    break;
-                case 'D':
-                    toggleSelection_navigateChild();
-                    break;
-                }
+            switch (key) {
+            case KEY_ARROW_LEFT:
+                navigateParent();
+                break;
+            case KEY_ARROW_RIGHT:
+                toggleSelection_navigateChild();
+                break;
+            case KEY_ARROW_UP:
+                moveCursor(-1);
+                break;
+            case KEY_ARROW_DOWN:
+                moveCursor(1);
+                break;
             }
             break;
         case 'q':
+        case '\n':
             shouldQuit = true;
             break;
         case 'j':
@@ -379,21 +599,6 @@ private:
     }
 
     // Command processing
-    void startCommand(const std::string &prefix) {
-        commandMode = true;
-        commandBuffer = prefix;
-    }
-
-    void executeCommand() {
-        if (commandBuffer.empty())
-            return;
-
-        if (commandBuffer[0] == ':') {
-            handleColonCommand();
-        } else {
-            handleSelectionCommand();
-        }
-    }
 
     void handleColonCommand() {
 
@@ -416,11 +621,8 @@ private:
             filters.clear();
             return;
         }
-        std::istringstream iss(exts);
-        std::string ext;
-        while (std::getline(iss, ext, ',')) {
-            filters.push_back("." + ext); // Auto-add dot prefix
-        }
+        filters = split_multi_delim(exts, " ,");
+        filtersChanged = true;
     }
 
     void handleColonSetSortPolicy() {
@@ -522,12 +724,24 @@ private:
         const auto hidden_style = showHidden ? fg(fmt::color::green) : fg(fmt::color::red);
 
         if (showHelp) {
-            printQuickHelp;
+            printQuickHelp();
         }
         fmt::print("\n");
 
         fmt::print(header_style, "📁 {}\n", currentPath.string());
         fmt::print(hidden_style, "[Hidden Folder: {}] ", showHidden ? "SHOWN" : "HIDDEN");
+        std::string filters_string;
+        if (filters.empty()) {
+            filters_string = fmt::format(fg(fmt::color::gray), "NONE");
+        } else {
+            for (const auto &filter : filters) {
+                filters_string += filter;
+                filters_string += ", ";
+            }
+            filters_string = filters_string.substr(0, filters_string.size() - 2);
+        }
+        fmt::print(fg(fmt::color::aqua), "[Applied Filter: {}", filters_string);
+        fmt::print(fg(fmt::color::aqua), "]");
         fmt::print("\n");
     }
 
@@ -535,7 +749,13 @@ private:
         const auto dir_style = fg(fmt::color::deep_sky_blue);
         const auto file_style = fg(fmt::color::white);
         const auto no_permission_style = fg(fmt::color::red);
-        const auto selected_style = fmt::emphasis::bold | fg(fmt::color::green);
+        const auto time_style = fg(fmt::color::pale_golden_rod);
+        const auto size_style = fg(fmt::color::royal_blue);
+        std::string item_bar;
+        item_bar = fmt::format(file_style, "{:<7}  {}  {:<40}", "", "No", "File Name");
+        item_bar += fmt::format(time_style, " {:<12}", "Modify Time", "Size");
+        item_bar += fmt::format(size_style, "  {}\n", "Size");
+        fmt::print("{}", item_bar);
 
         for (size_t i = 0; i < entries.size(); ++i) {
             bool hasPermission = true;
@@ -552,6 +772,8 @@ private:
                 selected = false;
             }
 
+            std::string entry_line;
+
             auto selectedPrompt = [selected, hasPermission]() -> std::string {
                 if (selected) {
                     return "[✓] ";
@@ -562,30 +784,75 @@ private:
                 }
             };
 
-            fmt::print(i == cursor ? "▶ " : "  ");
-            fmt::print(selectedPrompt());
+            entry_line += fmt::format(i == cursor ? "▶ " : "  ");
+            entry_line += selectedPrompt();
+
+            auto print_style = dir_style;
+
+            bool dir_entry = entry.is_directory();
             if (hasPermission) {
-                if (entry.is_directory()) {
-                    fmt::print(dir_style | fmt::emphasis::bold, "📁 ");
-                    fmt::print(dir_style, "{:3} {}\n",
-                               i + 1, entry.path().filename().string());
+                if (dir_entry) {
+                    print_style = dir_style;
+                    entry_line += fmt::format(print_style | fmt::emphasis::bold, "📁 ");
+
                 } else {
-                    fmt::print(file_style, "📄 ");
-                    fmt::print(file_style, "{:3} {}\n",
-                               i + 1, entry.path().filename().string());
+                    print_style = file_style;
+                    entry_line += fmt::format(print_style, "📄 ");
                 }
             } else {
-                fmt::print(no_permission_style, "❌ ");
-                fmt::print(no_permission_style, "{:3} {}\n",
-                           i + 1, entry.path().filename().string());
+                print_style = no_permission_style;
+                entry_line += fmt::format(print_style, "❌ ");
             }
+
+            entry_line += fmt::format(print_style, "{:2}  {:<40} ",
+                                      i + 1, entry.path().filename().string());
+
+            try {
+                auto file_time = fs::last_write_time(entry);
+                std::time_t tt = to_time_t(file_time);
+
+                std::tm local_tm = *std::localtime(&tt);
+                std::time_t now_tt = std::time(nullptr);
+                std::tm now_tm = *std::localtime(&now_tt);
+                constexpr std::time_t six_months_sec = 60 * 60 * 24 * 30 * 6;
+
+                if (std::abs(now_tt - tt) > six_months_sec) {
+                    // Show year
+                    entry_line += fmt::format(time_style, "{:%b %e  %Y}  ", local_tm);
+                } else {
+                    // Show time
+                    entry_line += fmt::format(time_style, "{:%b %e %H:%M}  ", local_tm);
+                }
+            } catch (...) {
+            }
+            try {
+                constexpr const char *suffixes[] = {"B", "K", "M", "G", "T", "P"};
+                int choose_suffix = 0;
+                double count;
+                if (!dir_entry)
+                    count = static_cast<double>(entry.file_size());
+
+                while (count >= 1024 && choose_suffix < 5) {
+                    count /= 1024;
+                    ++choose_suffix;
+                }
+                // fmt::print("{}",entry.file_size());
+                if (!dir_entry) {
+                    if (choose_suffix == 0) {
+                        entry_line += fmt::format(size_style, "{}{}", static_cast<std::uintmax_t>(count), suffixes[choose_suffix]);
+                    } else {
+                        entry_line += fmt::format(size_style, "{:.1f}{}", count, suffixes[choose_suffix]);
+                    }
+                } else {
+                    entry_line += fmt::format(size_style, " - ");
+                }
+            } catch (...) {
+            }
+            fmt::print("{}\n", entry_line);
         }
     }
 
     void drawFooter() {
-        if (commandMode) {
-            std::cout << "\nCommand: " << commandBuffer << "_";
-        }
         if (openFolderinRange) {
             std::cout << "Can't open a directory in range mode\n";
             openFolderinRange = false;
@@ -595,12 +862,20 @@ private:
             std::cout << " - " << f.filename() << "\n";
     }
 
+    std::time_t to_time_t(fs::file_time_type file_time) {
+        // Convert file_time_type to system_clock::time_point
+        using namespace std::chrono;
+        auto sctp = time_point_cast<system_clock::duration>(
+            file_time - fs::file_time_type::clock::now() + system_clock::now());
+        return system_clock::to_time_t(sctp);
+    }
+
     void printFullHelp() {
         const auto title_style = fmt::emphasis::bold | fg(fmt::color::gold);
         const auto section_style = fg(fmt::color::aqua) | fmt::emphasis::underline;
         const auto warn_style = fg(fmt::color::orange) | fmt::emphasis::bold;
 
-        fmt::print(title_style, "\n{:-^60}\n", " HELP ");
+        fmt::print(title_style, "\n{:-^80}\n", " HELP ");
         fmt::print(section_style, "\nNavigation:\n");
         fmt::print("  {:20} {}\n", "↑/k", "Move up");
         fmt::print("  {:20} {}\n", "↓/j", "Move down");
@@ -625,9 +900,9 @@ private:
         fmt::print("  {:20} {}\n", "!", "Toggle quick help");
         fmt::print("  {:20} {}\n", "?", "Print this full help");
 
-        fmt::print(title_style, "\n{:-^60}\n", "");
+        fmt::print(title_style, "\n{:-^80}\n", "");
     }
-    
+
     void printQuickHelp() {
         const auto title_style = fmt::emphasis::bold | fg(fmt::color::gold);
         fmt::print(title_style, "\n{:-^60}\n", " HELP ");
@@ -646,6 +921,28 @@ private:
                    "Space", "Numbers",
                    ":", "!", "?", "q");
         fmt::print(title_style, "\n{:-^60}\n", "");
+    }
+
+    std::vector<std::string> split_multi_delim(const std::string &input, const std::string &delims) {
+        std::vector<std::string> result;
+        std::string token;
+
+        for (char ch : input) {
+            if (delims.find(ch) != std::string::npos) {
+                if (!token.empty()) {
+                    result.push_back(token);
+                    token.clear();
+                }
+            } else {
+                token += ch;
+            }
+        }
+
+        if (!token.empty()) {
+            result.push_back(token);
+        }
+
+        return result;
     }
 #endif
 
