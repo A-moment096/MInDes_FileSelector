@@ -1,0 +1,40 @@
+{
+    "version": 3,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 19
+    },
+    "configurePresets": [
+        {
+            "name": "windows",
+            "generator": "Visual Studio 17 2022",
+            "binaryDir": "${sourceDir}/build/windows",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+            }
+        },
+        {
+            "name": "linux",
+            "description": "",
+            "displayName": "",
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build/linux",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "windows",
+            "configurePreset": "windows"
+        },
+        {
+            "name": "linux",
+            "description": "",
+            "displayName": "",
+            "configurePreset": "linux"
+        }
+    ]
+}

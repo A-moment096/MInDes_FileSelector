@@ -35,8 +35,7 @@ public:
     FileSelector(const std::string &start = ".", const std::vector<std::string> &exts = {})
         : currentPath(fs::canonical(start)),
           filters(exts) {}
-
-#endif //__unix__
+#endif
 
     std::vector<std::string> run() {
 #ifdef __unix__
@@ -44,7 +43,6 @@ public:
 #endif //__unix__
 
 #ifdef _WIN32
-        // Windows implementation can be added here
         return windowsRun();
 #endif // _WIN32
     }
@@ -66,6 +64,8 @@ private:
     bool showHidden = false;
     bool shouldQuit = false;
     std::string commandBuffer;
+    std::string sortPolicy = "dir,name";
+    bool sortPolicyChanged;
 
     std::vector<std::string> linuxRun() {
         setupTerminal();
@@ -88,6 +88,21 @@ private:
 
     void restoreTerminal() {
         tcsetattr(STDIN_FILENO, TCSAFLUSH, &originalTermios);
+    }
+
+    void setTerminalInputMode() {
+        termios t;
+        tcgetattr(STDIN_FILENO, &t);
+        t.c_lflag |= ICANON;
+        t.c_lflag |= ECHO;
+        tcsetattr(STDIN_FILENO, TCSAFLUSH, &t);
+    }
+
+    void setTerminalRawMode() {
+        termios t;
+        tcgetattr(STDIN_FILENO, &t);
+        t.c_lflag &= ~(ECHO | ICANON);
+        tcsetattr(STDIN_FILENO, TCSAFLUSH, &t);
     }
 
     // Path processing
@@ -140,22 +155,122 @@ private:
                     entries.push_back(entry);
                 }
             }
+
+            entrySort();
+
         } catch (...) {
         }
+    }
 
-        std::sort(entries.begin(), entries.end(), [](const auto &a, const auto &b) {
+    // Entry sorting
+    using Entry = std::filesystem::directory_entry;
+    using Comparator = std::function<bool(const Entry &, const Entry &)>;
+
+    void entrySort() {
+        // Comparator for directories first
+        Comparator comparator_directories_first = [](const Entry &a, const Entry &b) {
+            return a.is_directory() && !b.is_directory();
+        };
+        // Comparator for name
+        Comparator comparator_alphabetical = [](const Entry &a, const Entry &b) {
             return a.path().filename() < b.path().filename();
-        });
+        };
+        // Comparator for modified time
+        Comparator comparator_modified_time = [](const Entry &a, const Entry &b) {
+            return fs::last_write_time(a.path()) > fs::last_write_time(b.path());
+        };
+        // Comparator for extension
+        Comparator comparator_extension = [](const Entry &a, const Entry &b) {
+            return a.path().extension() < b.path().extension();
+        };
+        // Comparator for size
+        Comparator comparator_size = [](const Entry &a, const Entry &b) {
+            auto sizeA = fs::is_regular_file(a) ? fs::file_size(a) : 0;
+            auto sizeB = fs::is_regular_file(b) ? fs::file_size(b) : 0;
+            return sizeA < sizeB;
+        };
 
+        std::unordered_map<std::string, Comparator> comparatorMap = {
+            {"dir", comparator_directories_first},
+            {"size", comparator_size},
+            {"type", comparator_extension},
+            {"name", comparator_alphabetical},
+            {"time", comparator_modified_time}};
+
+        std::vector<Comparator> sorters;
+        std::istringstream ss(sortPolicy);
+        std::string token;
+
+        while (std::getline(ss, token, ',')) {
+            if (auto it = comparatorMap.find(token); it != comparatorMap.end()) {
+                sorters.push_back(it->second);
+            } else {
+                std::cerr << "Unknown sort key: " << token << std::endl;
+            }
+        }
+
+        auto finalComparator = combineComparators(sorters);
+        std::sort(entries.begin(), entries.end(), finalComparator);
         cursor = std::min(cursor, entries.empty() ? 0 : entries.size() - 1);
     }
 
+    Comparator combineComparators(const std::vector<Comparator> &comps) {
+        return [=](const Entry &a, const Entry &b) {
+            for (const auto &comp : comps) {
+                if (comp(a, b))
+                    return true;
+                if (comp(b, a))
+                    return false;
+            }
+            return false; // equal
+        };
+    }
+
     // Input handling
+
+    /*
+    If the key is a colon or a positive digit, it enters command mode;
+    Else, enter immediate mode;
+    Command mode: starts with a colon, followed by a command;
+    Immediate mode: read key inputs and handle them accordingly;
+
+    Immediate mode:
+        - Arrow keys: navigate through the list
+        - 'q': quit the program
+        - 'j': move down
+        - 'k': move up
+        - 'h' or '0': navigate to parent directory
+        - 'l' or ' ': toggle selection and navigate to child directory
+        - '!': toggle help
+        - '?': show full help
+        - 'H': toggle hidden files
+    */
     void processInput() {
         char key = readKey();
-        if (commandMode) {
-            handleCommandInput(key);
-        } else {
+        auto is_colon = [](char c) { return c == ':'; };
+        auto is_positive_digit = [](char c) { return c >= '1' && c <= '9'; };
+
+        if (is_colon(key)) { // Command mode
+            setTerminalInputMode();
+            fmt::print(fmt::emphasis::bold | fmt::fg(fmt::color::steel_blue),
+                       "Command {}", key);
+            std::getline(std::cin, commandBuffer);
+            commandBuffer = key + commandBuffer;
+            handleColonCommand();
+            setTerminalRawMode();
+            (false);
+        } else if (is_positive_digit(key)) {
+            setTerminalInputMode();
+            (true);
+            fmt::print(fmt::emphasis::bold | fmt::fg(fmt::color::steel_blue),
+                       "Number ");
+            fmt::print("{}", key);
+            std::getline(std::cin, commandBuffer);
+            commandBuffer = key + commandBuffer;
+            handleSelectionCommand();
+            setTerminalRawMode();
+            (false);
+        } else { // Immediate mode
             handleNormalInput(key);
         }
     }
@@ -166,21 +281,28 @@ private:
         return c;
     }
 
-    void handleCommandInput(char key) {
-        if (key == '\n') {
-            executeCommand();
-            commandMode = false;
-            commandBuffer.clear();
-        } else if (key == 127 || key == '\b') {
-            if (!commandBuffer.empty())
-                commandBuffer.pop_back();
-        } else if (key >= 32 && key <= 126) {
-            commandBuffer += key;
-        }
-    }
-
     void handleNormalInput(char key) {
         switch (key) {
+        case 27: // Escape key
+            read(STDIN_FILENO, &key, 1);
+            if (key == 91) { // Arrow keys
+                read(STDIN_FILENO, &key, 1);
+                switch (key) {
+                case 'A':
+                    moveCursor(-1);
+                    break;
+                case 'B':
+                    moveCursor(1);
+                    break;
+                case 'C':
+                    navigateParent();
+                    break;
+                case 'D':
+                    toggleSelection_navigateChild();
+                    break;
+                }
+            }
+            break;
         case 'q':
             shouldQuit = true;
             break;
@@ -198,12 +320,6 @@ private:
         case ' ':
             toggleSelection_navigateChild();
             break;
-        case ':':
-            startCommand(":");
-            break;
-        case '\n':
-            confirmSelection();
-            break;
         case '!':
             showHelp = !showHelp;
             break;
@@ -214,8 +330,7 @@ private:
             showHidden = !showHidden;
             break;
         default:
-            if (isdigit(key))
-                startCommand(std::string(1, key));
+            std::cout << "Invalid key pressed: " << key << "\n";
             break;
         }
     }
@@ -270,29 +385,35 @@ private:
     }
 
     void handleColonCommand() {
-        // commandBuffer.erase(
-        //     remove_if(
-        //         commandBuffer.begin(), commandBuffer.end(), isspace),
-        //     commandBuffer.end());
 
         if (commandBuffer == ":q") {
             shouldQuit = true;
         } else if (commandBuffer.find(":filter ") != std::string::npos) {
-            handleColonAddFilter();
+            handleColonConfigFilter();
         } else if (commandBuffer == ":help") {
             showFullHelp = true;
+        } else if (commandBuffer == ":sort") {
+            handleColonSetSortPolicy();
         } else {
             handleColonPathCommand();
         }
     }
 
-    void handleColonAddFilter() {
-        std::string exts = commandBuffer.substr(8);
+    void handleColonConfigFilter() {
+        std::string exts = commandBuffer.substr(std::string(":filter ").size());
+        if (exts == "-c") {
+            filters.clear();
+            return;
+        }
         std::istringstream iss(exts);
         std::string ext;
         while (std::getline(iss, ext, ',')) {
             filters.push_back("." + ext); // Auto-add dot prefix
         }
+    }
+
+    void handleColonSetSortPolicy() {
+        sortPolicy = commandBuffer.substr(std::string(":sort ").size());
     }
 
     void handleColonPathCommand() {
@@ -417,21 +538,49 @@ private:
     void drawFileList() {
         const auto dir_style = fg(fmt::color::deep_sky_blue);
         const auto file_style = fg(fmt::color::white);
+        const auto no_permission_style = fg(fmt::color::red);
+        const auto selected_style = fmt::emphasis::bold | fg(fmt::color::green);
 
         for (size_t i = 0; i < entries.size(); ++i) {
+            bool hasPermission = true;
             const auto &entry = entries[i];
-            const bool selected = selectedPaths.count(fs::canonical(entry.path()));
+            try {
+                (void)fs::canonical(entry.path());
+            } catch (...) {
+                hasPermission = false;
+            }
+            bool selected = false;
+            if (hasPermission) {
+                selected = selectedPaths.count(fs::canonical(entry.path()));
+            } else {
+                selected = false;
+            }
+
+            auto selectedPrompt = [selected, hasPermission]() -> std::string {
+                if (selected) {
+                    return "[✓] ";
+                } else if (!hasPermission) {
+                    return "[✗] ";
+                } else {
+                    return "[ ] ";
+                }
+            };
 
             fmt::print(i == cursor ? "▶ " : "  ");
-            fmt::print(selected ? "[✓] " : "[ ] ");
-
-            if (entry.is_directory()) {
-                fmt::print(dir_style | fmt::emphasis::bold, "📁 ");
-                fmt::print(dir_style, "{:3} {}\n",
-                           i + 1, entry.path().filename().string());
+            fmt::print(selectedPrompt());
+            if (hasPermission) {
+                if (entry.is_directory()) {
+                    fmt::print(dir_style | fmt::emphasis::bold, "📁 ");
+                    fmt::print(dir_style, "{:3} {}\n",
+                               i + 1, entry.path().filename().string());
+                } else {
+                    fmt::print(file_style, "📄 ");
+                    fmt::print(file_style, "{:3} {}\n",
+                               i + 1, entry.path().filename().string());
+                }
             } else {
-                fmt::print(file_style, "📄 ");
-                fmt::print(file_style, "{:3} {}\n",
+                fmt::print(no_permission_style, "❌ ");
+                fmt::print(no_permission_style, "{:3} {}\n",
                            i + 1, entry.path().filename().string());
             }
         }
@@ -495,7 +644,8 @@ private:
 
         OPENFILENAMEA ofn = {0};
         ofn.lStructSize = sizeof(ofn);
-        ofn.lpstrInitialDir = currentPath.string().c_str();
+        auto initial_directory_path = currentPath.string().c_str();
+        ofn.lpstrInitialDir = initial_directory_path;
 
         std::string filter{};
         for (const auto &ext : filters) {

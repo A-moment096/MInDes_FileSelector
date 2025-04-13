@@ -1,7 +1,7 @@
 #include "file_selector.hpp"
 
 int main() {
-    FileSelector nav(".", {".mindes"});
+    FileSelector nav(".", {});
     auto files = nav.run();
 
     std::cout << "\nSelected:\n";

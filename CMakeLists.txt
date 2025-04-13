@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 find_package(fmt REQUIRED)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-find_package(fmt PATHS C:/Developing/Libraries/fmt-11.1.4/build REQUIRED)
+find_package(fmt CONFIG REQUIRED)
 endif()
 
 add_executable(File_Selector main.cpp)
