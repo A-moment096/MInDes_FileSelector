@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
+#include <functional>
 #include <iostream>
 #include <set>
 #include <sstream>
@@ -28,7 +29,7 @@ class FileSelector {
 public:
 #ifdef __unix__
     FileSelector(const std::string &start, const std::vector<std::string> &exts)
-        : currentPath(expandTilde(fs::canonical(start))),
+        : currentPath(expandTilde(fs::canonical(start))), lastPath(currentPath),
           filters(exts), cursor(0),
           commandMode(false), showHelp(true) {}
 #elif defined(_WIN32)
@@ -49,6 +50,7 @@ public:
 
 private:
     fs::path currentPath;
+    fs::path lastPath;
     std::vector<std::string> filters;
 #ifdef __unix__
     // State management
@@ -65,7 +67,7 @@ private:
     bool shouldQuit = false;
     std::string commandBuffer;
     std::string sortPolicy = "dir,name";
-    bool sortPolicyChanged;
+    bool sortPolicyChanged = true;
 
     std::vector<std::string> linuxRun() {
         setupTerminal();
@@ -138,27 +140,36 @@ private:
 
     // Entry processing
     void refreshEntries() {
-        entries.clear();
-        try {
-            for (const auto &entry : fs::directory_iterator(currentPath)) {
-                std::string filename = entry.path().filename().string();
-                bool isHidden = !filename.empty() && filename[0] == '.';
-
-                bool include = false;
-                if (entry.is_directory()) {
-                    include = showHidden || !isHidden;
-                } else if (entry.is_regular_file()) {
-                    include = matchesFilter(entry.path()) &&
-                              (showHidden || !isHidden);
-                }
-                if (include) {
-                    entries.push_back(entry);
-                }
+        bool dirChanged{lastPath != currentPath};
+        if (sortPolicyChanged or dirChanged) {
+            if (dirChanged) {
+                lastPath = currentPath;
             }
 
-            entrySort();
+            entries.clear();
+            try {
+                for (const auto &entry : fs::directory_iterator(currentPath)) {
+                    std::string filename = entry.path().filename().string();
+                    bool isHidden = !filename.empty() && filename[0] == '.';
 
-        } catch (...) {
+                    bool include = false;
+                    if (entry.is_directory()) {
+                        include = showHidden || !isHidden;
+                    } else if (entry.is_regular_file()) {
+                        include = matchesFilter(entry.path()) &&
+                                  (showHidden || !isHidden);
+                    }
+                    if (include) {
+                        entries.push_back(entry);
+                    }
+                }
+
+                entrySort();
+                sortPolicyChanged = false;
+                dirChanged = false;
+
+            } catch (...) {
+            }
         }
     }
 
@@ -392,7 +403,7 @@ private:
             handleColonConfigFilter();
         } else if (commandBuffer == ":help") {
             showFullHelp = true;
-        } else if (commandBuffer == ":sort") {
+        } else if (commandBuffer.find(":sort ") != std::string::npos) {
             handleColonSetSortPolicy();
         } else {
             handleColonPathCommand();
@@ -414,6 +425,7 @@ private:
 
     void handleColonSetSortPolicy() {
         sortPolicy = commandBuffer.substr(std::string(":sort ").size());
+        sortPolicyChanged = true;
     }
 
     void handleColonPathCommand() {
@@ -508,25 +520,9 @@ private:
     void drawHeader() {
         const auto header_style = fmt::emphasis::bold | fg(fmt::color::light_blue);
         const auto hidden_style = showHidden ? fg(fmt::color::green) : fg(fmt::color::red);
-        const auto title_style = fmt::emphasis::bold | fg(fmt::color::gold);
 
         if (showHelp) {
-            fmt::print(title_style, "\n{:-^60}\n", " HELP ");
-            fmt::print(fg(fmt::color::light_gray),
-                       "\n"
-                       "Navigation:\n"
-                       "  {:<6} - Move up       {:<6} - Move down\n"
-                       "  {:<6} - Parent dir   {:<6} - Enter dir\n"
-                       "Selection:\n"
-                       "  {:<6} - Toggle       {:<6} - Multi-select\n"
-                       "Tools:\n"
-                       "  {:<6} - Path jump    {:<6} - Toggle this help\n"
-                       "  {:<6} - Full help    {:<6} - Quit\n",
-                       "↑/k", "↓/j",
-                       "←/h", "→/l",
-                       "Space", "Numbers",
-                       ":", "!", "?", "q");
-            fmt::print(title_style, "\n{:-^60}\n", "");
+            printQuickHelp;
         }
         fmt::print("\n");
 
@@ -629,6 +625,26 @@ private:
         fmt::print("  {:20} {}\n", "!", "Toggle quick help");
         fmt::print("  {:20} {}\n", "?", "Print this full help");
 
+        fmt::print(title_style, "\n{:-^60}\n", "");
+    }
+    
+    void printQuickHelp() {
+        const auto title_style = fmt::emphasis::bold | fg(fmt::color::gold);
+        fmt::print(title_style, "\n{:-^60}\n", " HELP ");
+        fmt::print(fg(fmt::color::light_gray),
+                   "\n"
+                   "Navigation:\n"
+                   "  {:<6} - Move up       {:<6} - Move down\n"
+                   "  {:<6} - Parent dir   {:<6} - Enter dir\n"
+                   "Selection:\n"
+                   "  {:<6} - Toggle       {:<6} - Multi-select\n"
+                   "Tools:\n"
+                   "  {:<6} - Path jump    {:<6} - Toggle this help\n"
+                   "  {:<6} - Full help    {:<6} - Quit\n",
+                   "↑/k", "↓/j",
+                   "←/h", "→/l",
+                   "Space", "Numbers",
+                   ":", "!", "?", "q");
         fmt::print(title_style, "\n{:-^60}\n", "");
     }
 #endif
