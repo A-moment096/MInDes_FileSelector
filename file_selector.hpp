@@ -33,8 +33,7 @@ public:
 #ifdef __unix__
     FileSelector(const std::string &start, const std::vector<std::string> &exts)
         : currentPath(expandTilde(fs::canonical(start))), lastPath(currentPath),
-          filters(exts), cursor(0),
-          showHelp(true) {}
+          filters(exts), cursor(0) {}
 #elif defined(_WIN32)
     FileSelector(const std::string &start = ".", const std::vector<std::string> &exts = {})
         : currentPath(fs::canonical(start)),
@@ -61,7 +60,7 @@ private:
     size_t cursor;
     std::set<fs::path> selectedPaths;
     termios originalTermios{};
-    bool showHelp;
+    bool showHelp = false;
     bool inRangeMode;
     bool openFolderinRange;
     bool showFullHelp = false;
@@ -71,6 +70,8 @@ private:
     std::string sortPolicy = "type,name";
     bool sortPolicyChanged = true;
     bool filtersChanged = false;
+    bool showSelected = true;
+    std::string searchName{};
 
     std::vector<std::string> linuxRun() {
         setupTerminal();
@@ -147,7 +148,8 @@ private:
     // Entry processing
     void refreshEntries() {
         bool dirChanged{lastPath != currentPath};
-        if (sortPolicyChanged or dirChanged or filtersChanged) {
+        bool searchingFile{!searchName.empty()};
+        if (sortPolicyChanged or dirChanged or filtersChanged or !searchingFile) {
             if (dirChanged) {
                 lastPath = currentPath;
             }
@@ -172,7 +174,7 @@ private:
 
                 entrySort();
                 sortPolicyChanged = false;
-                filtersChanged = true;
+                filtersChanged = false;
 
             } catch (...) {
             }
@@ -275,7 +277,7 @@ private:
 
             commandBuffer = getlineByChar();
 
-            commandBuffer = static_cast<char>(key) + commandBuffer;
+            // commandBuffer = static_cast<char>(key) + commandBuffer;
             handleColonCommand();
             setTerminalRawMode();
             (false);
@@ -284,9 +286,10 @@ private:
             (true);
             fmt::print(fmt::emphasis::bold | fmt::fg(fmt::color::steel_blue),
                        "Number ");
-            fmt::print("{}", key);
+            fmt::print("{}", static_cast<char>(key));
+            std::cout.flush();
 
-            std::getline(std::cin, commandBuffer);
+            commandBuffer = getlineByChar();
 
             commandBuffer = static_cast<char>(key) + commandBuffer;
             handleSelectionCommand();
@@ -413,7 +416,7 @@ private:
                 }
                 break;
             case KEY_ENTER:
-                std::cout << "\n";
+                return buffer;
                 break;
             default:
                 if (std::isprint(ch)) {
@@ -517,24 +520,22 @@ private:
 
     void handleNormalInput(int key) {
         switch (key) {
-        case 27: // Escape key
-            switch (key) {
-            case KEY_ARROW_LEFT:
-                navigateParent();
-                break;
-            case KEY_ARROW_RIGHT:
-                toggleSelection_navigateChild();
-                break;
-            case KEY_ARROW_UP:
-                moveCursor(-1);
-                break;
-            case KEY_ARROW_DOWN:
-                moveCursor(1);
-                break;
-            }
+
+        case KEY_ARROW_LEFT:
+            navigateParent();
+            break;
+        case KEY_ARROW_RIGHT:
+            toggleSelection_navigateChild();
+            break;
+        case KEY_ARROW_UP:
+            moveCursor(-1);
+            break;
+        case KEY_ARROW_DOWN:
+            moveCursor(1);
             break;
         case 'q':
         case '\n':
+        case '\r':
             shouldQuit = true;
             break;
         case 'j':
@@ -559,6 +560,9 @@ private:
             break;
         case 'H':
             showHidden = !showHidden;
+            break;
+        case 'S':
+            showSelected = !showSelected;
             break;
         default:
             std::cout << "Invalid key pressed: " << key << "\n";
@@ -602,21 +606,41 @@ private:
 
     void handleColonCommand() {
 
-        if (commandBuffer == ":q") {
+        if (commandBuffer == "q") {
             shouldQuit = true;
-        } else if (commandBuffer.find(":filter ") != std::string::npos) {
+        } else if (commandBuffer.find("filter ") != std::string::npos) {
             handleColonConfigFilter();
-        } else if (commandBuffer == ":help") {
+        } else if (commandBuffer == "help") {
             showFullHelp = true;
-        } else if (commandBuffer.find(":sort ") != std::string::npos) {
+        } else if (commandBuffer.find("sort ") != std::string::npos) {
             handleColonSetSortPolicy();
+        } else if (commandBuffer.find("search ") != std::string::npos) {
+            handleColonSearch();
         } else {
             handleColonPathCommand();
         }
     }
 
+    void handleColonSearch() {
+        searchName = commandBuffer.substr(std::string("search ").size());
+        if (searchName == "-c") {
+            searchName.clear();
+            return;
+        }
+        std::transform(searchName.begin(), searchName.end(), searchName.begin(), ::tolower);
+        std::vector<fs::directory_entry> search_results{};
+        for (const auto &entry : entries) {
+            std::string entry_filename = entry.path().filename();
+            std::transform(entry_filename.begin(), entry_filename.end(), entry_filename.begin(), ::tolower);
+            if (entry_filename.find(searchName) != std::string::npos) {
+                search_results.push_back(entry);
+            }
+        }
+        entries = search_results;
+    }
+
     void handleColonConfigFilter() {
-        std::string exts = commandBuffer.substr(std::string(":filter ").size());
+        std::string exts = commandBuffer.substr(std::string("filter ").size());
         if (exts == "-c") {
             filters.clear();
             return;
@@ -626,7 +650,7 @@ private:
     }
 
     void handleColonSetSortPolicy() {
-        sortPolicy = commandBuffer.substr(std::string(":sort ").size());
+        sortPolicy = commandBuffer.substr(std::string("sort ").size());
         sortPolicyChanged = true;
     }
 
@@ -722,14 +746,26 @@ private:
     void drawHeader() {
         const auto header_style = fmt::emphasis::bold | fg(fmt::color::light_blue);
         const auto hidden_style = showHidden ? fg(fmt::color::green) : fg(fmt::color::red);
+        const auto search_style = fmt::emphasis::italic | fg(fmt::color::sea_green);
 
+        fmt::print(bg(fmt::color::light_gray), "Type {} for quick help & {} for full features\n", "'!'",
+                   "'?'");
         if (showHelp) {
             printQuickHelp();
         }
         fmt::print("\n");
-
         fmt::print(header_style, "📁 {}\n", currentPath.string());
-        fmt::print(hidden_style, "[Hidden Folder: {}] ", showHidden ? "SHOWN" : "HIDDEN");
+
+        if (!searchName.empty()) {
+            std::string searchPrompt = fmt::format(fg(fmt::color::sea_green), "[Searching: ");
+            searchPrompt += fmt::format(search_style, "{}", searchName);
+            searchPrompt += fmt::format(fg(fmt::color::sea_green), "] ");
+            fmt::print(searchPrompt);
+            if (lastPath != currentPath) {
+                searchName.clear();
+            }
+        }
+
         std::string filters_string;
         if (filters.empty()) {
             filters_string = fmt::format(fg(fmt::color::gray), "NONE");
@@ -741,7 +777,10 @@ private:
             filters_string = filters_string.substr(0, filters_string.size() - 2);
         }
         fmt::print(fg(fmt::color::aqua), "[Applied Filter: {}", filters_string);
-        fmt::print(fg(fmt::color::aqua), "]");
+        fmt::print(fg(fmt::color::aqua), "] ");
+
+        fmt::print(hidden_style, "[Hidden Folder: {}] ", showHidden ? "SHOWN" : "HIDDEN");
+
         fmt::print("\n");
     }
 
@@ -858,8 +897,10 @@ private:
             openFolderinRange = false;
         }
         std::cout << "\nSelected: " << selectedPaths.size() << " files\n";
-        for (auto &f : selectedPaths)
-            std::cout << " - " << f.filename() << "\n";
+        if (showSelected) {
+            for (auto &f : selectedPaths)
+                std::cout << " - " << f.filename() << "\n";
+        }
     }
 
     std::time_t to_time_t(fs::file_time_type file_time) {

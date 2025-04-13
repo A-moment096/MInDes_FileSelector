@@ -5,8 +5,8 @@
 - [x] Show modified time / Size
 - [x] (!) Refresh on filter change
 - [x] Show applied filter
-- [ ] Show "Selected List" on (Demand/Left panel)
-- [ ] Add "search" command (Regex/Normal)
+- [x] Show "Selected List" on (Demand/Left panel)
+- [x] Add "search" command (Regex/Normal)
 
 ## Code
 - [ ] Rename variables 
