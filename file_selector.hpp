@@ -32,27 +32,27 @@ class FileSelector {
 public:
 #ifdef __unix__
     FileSelector(const std::string &start, const std::vector<std::string> &exts)
-        : currentPath(expandTilde(fs::canonical(start))), lastPath(currentPath),
+        : currentDirectory(expandTilde(fs::canonical(start))), previousDirectory(currentDirectory),
           filters(exts), cursor(0) {}
 #elif defined(_WIN32)
     FileSelector(const std::string &start = ".", const std::vector<std::string> &exts = {})
-        : currentPath(fs::canonical(start)),
+        : currentDirectory(fs::canonical(start)),
           filters(exts) {}
 #endif
 
     std::vector<std::string> run() {
 #ifdef __unix__
-        return linuxRun();
+        return runLinux();
 #endif //__unix__
 
 #ifdef _WIN32
-        return windowsRun();
+        return runWindows();
 #endif // _WIN32
     }
 
 private:
-    fs::path currentPath;
-    fs::path lastPath;
+    fs::path currentDirectory;
+    fs::path previousDirectory;
     std::vector<std::string> filters;
 #ifdef __unix__
     // State management
@@ -68,12 +68,12 @@ private:
     bool shouldQuit = false;
     std::string commandBuffer;
     std::string sortPolicy = "type,name";
-    bool sortPolicyChanged = true;
-    bool filtersChanged = false;
+    bool isSortPolicyChanged = true;
+    bool isFiltersChanged = false;
     bool showSelected = true;
     std::string searchName{};
 
-    std::vector<std::string> linuxRun() {
+    std::vector<std::string> runLinux() {
         setupTerminal();
         while (!shouldQuit) {
             refreshEntries();
@@ -147,16 +147,16 @@ private:
 
     // Entry processing
     void refreshEntries() {
-        bool dirChanged{lastPath != currentPath};
+        bool dirChanged{previousDirectory != currentDirectory};
         bool searchingFile{!searchName.empty()};
-        if (sortPolicyChanged or dirChanged or filtersChanged or !searchingFile) {
+        if (isSortPolicyChanged or dirChanged or isFiltersChanged or !searchingFile) {
             if (dirChanged) {
-                lastPath = currentPath;
+                previousDirectory = currentDirectory;
             }
 
             entries.clear();
             try {
-                for (const auto &entry : fs::directory_iterator(currentPath)) {
+                for (const auto &entry : fs::directory_iterator(currentDirectory)) {
                     std::string filename = entry.path().filename().string();
                     bool isHidden = !filename.empty() && filename[0] == '.';
 
@@ -173,8 +173,8 @@ private:
                 }
 
                 entrySort();
-                sortPolicyChanged = false;
-                filtersChanged = false;
+                isSortPolicyChanged = false;
+                isFiltersChanged = false;
 
             } catch (...) {
             }
@@ -247,23 +247,6 @@ private:
 
     // Input handling
 
-    /*
-    If the key is a colon or a positive digit, it enters command mode;
-    Else, enter immediate mode;
-    Command mode: starts with a colon, followed by a command;
-    Immediate mode: read key inputs and handle them accordingly;
-
-    Immediate mode:
-        - Arrow keys: navigate through the list
-        - 'q': quit the program
-        - 'j': move down
-        - 'k': move up
-        - 'h' or '0': navigate to parent directory
-        - 'l' or ' ': toggle selection and navigate to child directory
-        - '!': toggle help
-        - '?': show full help
-        - 'H': toggle hidden files
-    */
     void processInput() {
         int key = readKey();
         auto is_colon = [](int c) { return c == ':'; };
@@ -454,7 +437,7 @@ private:
 
     int readKey() {
         char seq[10]{};
-        char readedLength = read(STDIN_FILENO, &seq[0], 10);
+        size_t readedLength = read(STDIN_FILENO, &seq[0], 10);
         if (readedLength != 1) {
             if (readedLength == 2) {
                 switch (seq[1]) {
@@ -578,7 +561,7 @@ private:
     }
 
     void navigateParent() {
-        currentPath = currentPath.parent_path();
+        currentDirectory = currentDirectory.parent_path();
         cursor = 0;
     }
 
@@ -593,7 +576,7 @@ private:
         } else if (entry.is_regular_file()) {
             selectedPaths.insert(canonical);
         } else if (entry.is_directory()) {
-            currentPath = fs::canonical(entry.path());
+            currentDirectory = fs::canonical(entry.path());
             cursor = 0;
         }
     }
@@ -646,19 +629,19 @@ private:
             return;
         }
         filters = split_multi_delim(exts, " ,");
-        filtersChanged = true;
+        isFiltersChanged = true;
     }
 
     void handleColonSetSortPolicy() {
         sortPolicy = commandBuffer.substr(std::string("sort ").size());
-        sortPolicyChanged = true;
+        isSortPolicyChanged = true;
     }
 
     void handleColonPathCommand() {
         try {
             fs::path newPath = expandTilde(commandBuffer.substr(1));
             if (fs::is_directory(newPath)) {
-                currentPath = fs::canonical(newPath);
+                currentDirectory = fs::canonical(newPath);
                 cursor = 0;
             }
         } catch (...) {
@@ -719,7 +702,7 @@ private:
             selectedPaths.insert(canonical);
         } else if (entry.is_directory()) {
             if (!inRangeMode) {
-                currentPath = fs::canonical(entry.path());
+                currentDirectory = fs::canonical(entry.path());
                 cursor = 0;
             } else {
                 openFolderinRange = true;
@@ -745,23 +728,23 @@ private:
 
     void drawHeader() {
         const auto header_style = fmt::emphasis::bold | fg(fmt::color::light_blue);
-        const auto hidden_style = showHidden ? fg(fmt::color::green) : fg(fmt::color::red);
+        const auto hidden_style = showHidden ? fg(fmt::color::light_green) : fg(fmt::color::light_pink);
         const auto search_style = fmt::emphasis::italic | fg(fmt::color::sea_green);
 
-        fmt::print(bg(fmt::color::light_gray), "Type {} for quick help & {} for full features\n", "'!'",
-                   "'?'");
         if (showHelp) {
             printQuickHelp();
+        } else {
+            fmt::print(fg(fmt::color::dark_gray) | bg(fmt::color::light_gray), "Press '!' for floating help or '?' for full features");
         }
         fmt::print("\n");
-        fmt::print(header_style, "📁 {}\n", currentPath.string());
+        fmt::print(header_style, "📁 {}\n", currentDirectory.string());
 
         if (!searchName.empty()) {
             std::string searchPrompt = fmt::format(fg(fmt::color::sea_green), "[Searching: ");
             searchPrompt += fmt::format(search_style, "{}", searchName);
             searchPrompt += fmt::format(fg(fmt::color::sea_green), "] ");
-            fmt::print(searchPrompt);
-            if (lastPath != currentPath) {
+            std::cout << searchPrompt;
+            if (previousDirectory != currentDirectory) {
                 searchName.clear();
             }
         }
@@ -779,7 +762,7 @@ private:
         fmt::print(fg(fmt::color::aqua), "[Applied Filter: {}", filters_string);
         fmt::print(fg(fmt::color::aqua), "] ");
 
-        fmt::print(hidden_style, "[Hidden Folder: {}] ", showHidden ? "SHOWN" : "HIDDEN");
+        fmt::print(hidden_style, "[Show Hidden?: {}] ", showHidden ? "YES" : "No");
 
         fmt::print("\n");
     }
@@ -823,7 +806,7 @@ private:
                 }
             };
 
-            entry_line += fmt::format(i == cursor ? "▶ " : "  ");
+            entry_line += i == cursor ? "▶ " : "  ";
             entry_line += selectedPrompt();
 
             auto print_style = dir_style;
@@ -990,7 +973,7 @@ private:
 #ifdef _WIN32
     std::string windowTitle{};
 
-    std::vector<std::string> windowsRun() {
+    std::vector<std::string> runWindows() {
         // Allocate large buffer to hold multiple file names
         const DWORD bufferSize = 65536; // 64 KB
         char *szBuffer = new char[bufferSize];
@@ -998,7 +981,7 @@ private:
 
         OPENFILENAMEA ofn = {0};
         ofn.lStructSize = sizeof(ofn);
-        auto initial_directory_path = currentPath.string().c_str();
+        auto initial_directory_path = currentDirectory.string().c_str();
         ofn.lpstrInitialDir = initial_directory_path;
 
         std::string filter{};
