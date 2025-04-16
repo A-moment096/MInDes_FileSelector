@@ -145,7 +145,7 @@ std::string TerminalManager::getLineByChar() {
             }
             break;
         case KEY_ARROW_UP:
-            if (historyPosition > 1) {
+            if (historyPosition > 0) {
                 historyPosition--;
 
                 // Buffer & screen clear
@@ -154,7 +154,7 @@ std::string TerminalManager::getLineByChar() {
                 }
                 buffer.clear();
 
-                size_t history_read_pos = historyPosition - 1;
+                size_t history_read_pos = historyPosition;
                 std::string history_commad = commandHistory.at(history_read_pos);
                 for (const char ch : history_commad) {
                     writeBuffer(buffer, cursor_pos, ch);
@@ -171,7 +171,7 @@ std::string TerminalManager::getLineByChar() {
                 }
                 buffer.clear();
 
-                size_t history_read_pos = historyPosition;
+                size_t history_read_pos = historyPosition - 1;
                 std::string history_commad = commandHistory.at(history_read_pos);
                 for (const char ch : history_commad) {
                     writeBuffer(buffer, cursor_pos, ch);

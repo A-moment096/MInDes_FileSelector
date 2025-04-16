@@ -13,5 +13,4 @@ public:
 private:
     std::string startPath;
     std::vector<std::string> extensions;
-    void printErr(int ERROR_CODE);
 };

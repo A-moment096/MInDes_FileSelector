@@ -17,10 +17,10 @@ public:
     // Process a full command string (that starts with a colon).
     void processCommandInput(const std::string &command);
 
-    int processNumberInput(const std::string &command);
+    void processNumberInput(const std::string &command);
 
     // Toggle the selection state of the entry at the given index.
-    int toggleSelectionAtIndex(size_t index, bool is_multi_selection);
+    void toggleSelectionAtIndex(size_t index, bool is_multi_selection);
 
     // Move the cursor up or down.
     void moveCursor(int delta);
@@ -36,6 +36,7 @@ public:
 
     bool isShowHint{false};
     bool isShowHidden{false};
+    bool isShowSelected{true};
 
 private:
     FileSystemManager &fsManager;

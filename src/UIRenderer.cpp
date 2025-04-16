@@ -186,7 +186,7 @@ std::string UIRenderer::getFilterStatus(const std::vector<std::string> &activeFi
     } else {
         for (const auto &filter : activeFilters) {
             active_filter_status += filter;
-            if (active_filter_status != activeFilters.back()) {
+            if (filter != activeFilters.back()) {
                 active_filter_status += ", ";
             }
         }

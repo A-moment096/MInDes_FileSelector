@@ -18,11 +18,14 @@ void CommandProcessor::processImmediateInput(int key) {
     case KEY_ARROW_LEFT:
     case 'h':
     case '0':
+    case 127: // Backspace
         // Navigate to parent directory.
         fsManager.navigateParent();
         cursor = 0;
         break;
     case KEY_ARROW_RIGHT:
+    case '\n':
+    case '\r':
     case 'l':
     case ' ': {
         const auto &entries = fsManager.getEntries();
@@ -46,8 +49,6 @@ void CommandProcessor::processImmediateInput(int key) {
         moveCursor(1);
         break;
     case 'q':
-    case '\n':
-    case '\r':
         quit = true;
         break;
     case '!':
@@ -59,8 +60,11 @@ void CommandProcessor::processImmediateInput(int key) {
     case 'H':
         isShowHidden = !isShowHidden;
         break;
+    case 'S':
+        isShowSelected = !isShowSelected;
+        break;
     default:
-        std::cout << "Invalid key pressed: " << key << "\n";
+        throw std::invalid_argument("Invalid Input");
         break;
     }
 }
@@ -100,11 +104,14 @@ void CommandProcessor::processCommandInput(const std::string &command) {
         if (fs::is_directory(newPath)) {
             fsManager.navigateTo(newPath);
             cursor = 0;
+        } else {
+            const std::string error_message = "Unkown path or command: " + command;
+            throw std::invalid_argument(error_message);
         }
     }
 }
 
-int CommandProcessor::processNumberInput(const std::string &command) {
+void CommandProcessor::processNumberInput(const std::string &command) {
     std::istringstream iss(command);
     std::string token;
     bool is_multi_mode = (command.find(',') != std::string::npos) or
@@ -112,7 +119,6 @@ int CommandProcessor::processNumberInput(const std::string &command) {
                          (command.find('-') != std::string::npos);
 
     int entry_size = (int)fsManager.getEntries().size();
-    int ERROR_CODE{0};
 
     while (std::getline(iss, token, ',')) {
         size_t dash_position = token.find('-');
@@ -122,23 +128,23 @@ int CommandProcessor::processNumberInput(const std::string &command) {
             int start = std::stoi(token.substr(0, dash_position));
             int end = std::stoi(token.substr(dash_position + 1));
             for (int index = std::max(1, start); index <= std::min(end, entry_size); ++index) {
-                ERROR_CODE += toggleSelectionAtIndex(index - 1, is_multi_mode);
+                toggleSelectionAtIndex(index - 1, is_multi_mode);
             }
         } else {
             // single mode
             int index = std::stoi(token);
             if (index >= 1 && index <= entry_size) {
-                ERROR_CODE = toggleSelectionAtIndex(index - 1, is_multi_mode);
+                toggleSelectionAtIndex(index - 1, is_multi_mode);
             }
         }
     }
-    return ERROR_CODE > 0 ? 1 : 0;
 }
 
-int CommandProcessor::toggleSelectionAtIndex(size_t index, bool is_multi_selection) {
+void CommandProcessor::toggleSelectionAtIndex(size_t index, bool is_multi_selection) {
     const auto &entries = fsManager.getEntries();
-    if (index >= entries.size())
-        return 0;
+    if (index >= entries.size()) {
+        return;
+    }
     const auto &entry = entries[index];
     fs::path canonical = fs::canonical(entry.path());
     // Toggle selection: if already selected, unselect it.
@@ -151,12 +157,11 @@ int CommandProcessor::toggleSelectionAtIndex(size_t index, bool is_multi_selecti
             fsManager.navigateTo(entry.path());
             cursor = 0;
         } else {
-            return 1;
+            throw std::invalid_argument("Can't open a directory in range mode ");
         }
     } else {
-        return 2;
+        throw std::runtime_error("Invalid entry detected");
     }
-    return 0;
 }
 
 void CommandProcessor::moveCursor(int delta) {
