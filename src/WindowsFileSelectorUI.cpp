@@ -5,7 +5,11 @@
 #include <algorithm>
 #include <windows.h>
 
-WindowsFileSelectorUI::WindowsFileSelectorUI(const std::string &start, const std::vector<std::string> &exts) : startPath(start), extensions(exts) {
+#include <fmt/color.h>
+#include <fmt/core.h>
+
+WindowsFileSelectorUI::WindowsFileSelectorUI(const std::string &start, const std::vector<std::string> &exts)
+    : startPath(start), extensions(exts) {
 }
 
 std::vector<std::string> WindowsFileSelectorUI::run() {

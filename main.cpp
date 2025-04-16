@@ -1,6 +1,8 @@
 #include "src/FileSelector.hpp"
 // #include "file_selector.hpp"
 #include <fmt/core.h>
+#include <string>
+#include <vector>
 
 int main() {
     std::vector<std::string> files;

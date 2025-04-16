@@ -10,7 +10,7 @@
 
 ## Code
 - [ ] Rename variables 
-- [ ] Simplify deeply nested functions
+- [x] Simplify deeply nested functions
 
 ## Other
 - [ ] Complete HELP document
