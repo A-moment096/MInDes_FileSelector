@@ -9,10 +9,10 @@
 - [x] Add "search" command (Regex/Normal)
 
 ## Code
-- [ ] Rename variables 
+- [x] Rename variables 
 - [x] Simplify deeply nested functions
 
 ## Other
-- [ ] Complete HELP document
+- [x] Complete HELP document
 - [ ] ? Show QUICK HELP Only at started
 - [ ] ? BOX UI

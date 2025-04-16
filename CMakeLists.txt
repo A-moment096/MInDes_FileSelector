@@ -1,37 +1,38 @@
-# cmake_minimum_required(VERSION 3.10.0)
-# project(File_Selector VERSION 0.1.0 LANGUAGES C CXX)
-
-# set(CMAKE_CXX_STANDARD 17)
-
-# if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-# find_package(fmt REQUIRED)
-# elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-# find_package(fmt CONFIG REQUIRED)
-# endif()
-
-# add_executable(File_Selector main.cpp)
-# target_include_directories(File_Selector PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-# target_link_libraries(File_Selector PRIVATE fmt::fmt)
-
 cmake_minimum_required(VERSION 3.16)
-project(FileSelectorApp)
+project(FileSelector LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Add fmt library (make sure it's installed or use FetchContent)
+# Find dependencies
 find_package(fmt REQUIRED)
 
-# Add source directory
-include_directories(src)
+# Component control options
+option(BUILD_SHARED_LIBS "Build shared libraries" ON)
+option(BUILD_STATIC_LIBS "Build static libraries" ON)
+option(BUILD_EXECUTABLE "Build the executable" ON)
 
-# Collect all source files
-file(GLOB_RECURSE SOURCES
-    src/*.cpp
-)
+# Library sources (exclude main.cpp)
+file(GLOB_RECURSE LIB_SOURCES src/*.cpp)
 
-# Define executable
-add_executable(FileSelectorApp main.cpp ${SOURCES})
+# Conditionally build libraries
+if(BUILD_STATIC_LIBS)
+    add_library(FileSelectorStatic STATIC ${LIB_SOURCES})
+    target_include_directories(FileSelectorStatic PUBLIC src)
+    target_link_libraries(FileSelectorStatic PUBLIC fmt::fmt)
+    set_target_properties(FileSelectorStatic PROPERTIES OUTPUT_NAME FileSelector)
+endif()
 
-# Link libraries
-target_link_libraries(FileSelectorApp PRIVATE fmt::fmt)
+if(BUILD_SHARED_LIBS)
+    add_library(FileSelectorShared SHARED ${LIB_SOURCES})
+    target_include_directories(FileSelectorShared PUBLIC src)
+    target_link_libraries(FileSelectorShared PUBLIC fmt::fmt)
+    set_target_properties(FileSelectorShared PROPERTIES OUTPUT_NAME FileSelector)
+    endif()
+
+# Conditionally build executable
+if(BUILD_EXECUTABLE)
+    add_executable(FileSelectorApp main.cpp ${LIB_SOURCES})
+    target_include_directories(FileSelectorApp PRIVATE src)
+    target_link_libraries(FileSelectorApp PRIVATE fmt::fmt)
+endif()
