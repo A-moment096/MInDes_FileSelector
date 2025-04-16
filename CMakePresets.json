@@ -6,35 +6,60 @@
     },
     "configurePresets": [
         {
-            "name": "windows",
+            "name": "windows_debug",
             "generator": "Visual Studio 17 2022",
-            "binaryDir": "${sourceDir}/build/windows",
+            "binaryDir": "${sourceDir}/build/windows/Debug",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
             }
         },
         {
-            "name": "linux",
+            "name": "windows_release",
+            "generator": "Visual Studio 17 2022",
+            "binaryDir": "${sourceDir}/build/windows/Release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+            }
+        },
+        {
+            "name": "linux_debug",
             "description": "",
             "displayName": "",
             "generator": "Unix Makefiles",
-            "binaryDir": "${sourceDir}/build/linux",
+            "binaryDir": "${sourceDir}/build/linux/Debug",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "linux_release",
+            "description": "",
+            "displayName": "",
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build/linux/Release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
             }
         }
     ],
     "buildPresets": [
         {
-            "name": "windows",
-            "configurePreset": "windows"
+            "name": "windows_debug",
+            "configurePreset": "windows_debug"
         },
         {
-            "name": "linux",
-            "description": "",
-            "displayName": "",
-            "configurePreset": "linux"
+            "name": "windows_release",
+            "configurePreset": "windows_release"
+        },
+        {
+            "name": "linux_debug",
+            "configurePreset": "linux_debug"
+        },
+        {
+            "name": "linux_release",
+            "configurePreset": "linux_release"
         }
     ]
 }

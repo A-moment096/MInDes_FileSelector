@@ -2,14 +2,16 @@
 #pragma once
 #ifdef __unix__
 #include <string>
+#include <vector>
+
 #include <termios.h>
 #include <unistd.h>
-#include <vector>
 
 class TerminalManager {
 public:
     TerminalManager();
     ~TerminalManager();
+
     void setRawMode();
     void setCanonicalMode();
     void restoreTerminal();

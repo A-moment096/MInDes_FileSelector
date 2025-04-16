@@ -22,7 +22,7 @@ public:
 
     void refreshDirectory(bool showHidden);
     void setSortPolicy(const std::string &policy);
-    void setFilters(const std::vector<std::string> &exts);
+    void setFilters(const std::string &exts);
     void search();
 
     const std::vector<Entry> &getEntries() const { return entries; }
@@ -38,12 +38,13 @@ public:
 private:
     fs::path currentDirectory;
     fs::path previousDirectory;
-    std::vector<std::string> filters;
     std::vector<Entry> entries;
-    std::string sortPolicy = "dir,type,name";
+    std::vector<std::string> filters;
+    std::vector<std::string> sortPolicy{"dir", "type", "name"};
 
     void sortEntries();
     Comparator combineComparators(const std::vector<Comparator> &comps);
     bool matchesFilter(const fs::path &p) const;
+    void commandStringParser(std::vector<std::string> &vector, const std::string &str);
 };
 #endif // __unix__

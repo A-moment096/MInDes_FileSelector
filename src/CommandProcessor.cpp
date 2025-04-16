@@ -18,7 +18,6 @@ void CommandProcessor::processImmediateInput(int key) {
     switch (key) {
     case KEY_ARROW_LEFT:
     case 'h':
-    case '0':
     case 127: // Backspace
         // Navigate to parent directory.
         fsManager.navigateParent();
@@ -51,6 +50,7 @@ void CommandProcessor::processImmediateInput(int key) {
         break;
     case 'q':
         quit = true;
+
         break;
     case '!':
         isShowHint = !isShowHint;
@@ -71,34 +71,39 @@ void CommandProcessor::processImmediateInput(int key) {
 }
 
 void CommandProcessor::processCommandInput(const std::string &command) {
-    if (command == "q") {
+    std::stringstream command_stream{command};
+    std::string command_token{};
+    const auto trim_whitespace = [](const std::string &s) {
+        size_t start = s.find_first_not_of(" \t\n\r");
+        if (start == std::string::npos)
+            return std::string();
+
+        size_t end = s.find_last_not_of(" \t\n\r");
+        return s.substr(start, end - start + 1);
+    };
+    // std::getline(command_stream, command_token, ' ');
+    command_stream >> command_token;
+    if (command_token == "q" or command_token == "Q") {
         quit = true;
-    } else if (command.compare(0, 7, "filter ") == 0) {
-        // Example: ":filter txt,cpp" splits the list.
-        std::string exts = command.substr(7);
-        std::vector<std::string> filters;
-        std::istringstream iss(exts);
-        std::string token;
-        // Support splitting by commas (and possible spaces)
-        while (std::getline(iss, token, ',')) {
-            std::istringstream iss2(token);
-            std::string ext;
-            while (iss2 >> ext) {
-                filters.push_back(ext);
-            }
-        }
-        fsManager.setFilters(filters);
-    } else if (command == "help") {
-        // Delegate help rendering to the UI Renderer.
-        uiRenderer.drawHelp(true);
-    } else if (command.compare(0, 5, "sort ") == 0) {
-        std::string policy = command.substr(5);
+    } else if (command_token == "filter") {
+        std::string exts{};
+        std::getline(command_stream, exts);
+        fsManager.setFilters(exts);
+    } else if (command_token == "sort") {
+        std::string policy;
+        std::getline(command_stream, policy);
         fsManager.setSortPolicy(policy);
-    } else if (command.compare(0, 7, "search ") == 0) {
-        std::string searchTerm = command.substr(7);
-        // Convert search term to lower-case.
-        std::transform(searchTerm.begin(), searchTerm.end(), searchTerm.begin(), ::tolower);
-        fsManager.searchName = searchTerm;
+    } else if (command_token == "search") {
+        std::string search_name;
+        std::getline(command_stream, search_name);
+        if (!search_name.empty()) {
+            std::transform(search_name.begin(), search_name.end(), search_name.begin(), ::tolower);
+            fsManager.searchName = trim_whitespace(search_name); // Trim the leading space
+        } else {
+            fsManager.searchName = search_name;
+        }
+    } else if (command_token == "help") {
+        uiRenderer.drawHelp(true);
     } else {
         // Assume a path jump command.
         fs::path newPath = FileSystemManager::expandTilde(command);
@@ -106,8 +111,10 @@ void CommandProcessor::processCommandInput(const std::string &command) {
             fsManager.navigateTo(newPath);
             cursor = 0;
         } else {
-            const std::string error_message = "Unkown path or command: " + command;
-            throw std::invalid_argument(error_message);
+            if (!command.empty()) {
+                const std::string error_message = "Unkown path or command: " + command;
+                throw std::invalid_argument(error_message);
+            }
         }
     }
 }

@@ -35,7 +35,7 @@ std::vector<std::string> UnixFileSelectorUI::run() {
 
         uiRenderer.drawHelp(false);
         uiRenderer.drawHeader(fsManager.getCurrentDirectory().string(), fsManager.getFilters(),
-                              cmdProcessor.isShowHidden, fsManager.searchName, cmdProcessor.isShowHint);
+                              cmdProcessor.isShowHidden, fsManager.searchName, cmdProcessor.isShowHint, cmdProcessor.isShowSelected);
         uiRenderer.drawFileList(fsManager.getEntries(), cmdProcessor.getCursor(),
                                 cmdProcessor.getSelectedPaths());
         if (!error_message.empty()) {
@@ -56,7 +56,7 @@ std::vector<std::string> UnixFileSelectorUI::run() {
                 cmdProcessor.processCommandInput(command_buffer);
                 command_buffer.clear();
                 termMgr.setRawMode();
-            } else if (key >= '1' && key <= '9') {
+            } else if (key >= '0' && key <= '9') {
                 termMgr.setCanonicalMode();
                 fmt::print(fmt::fg(fmt::color::steel_blue),
                            "Number ");
@@ -71,9 +71,13 @@ std::vector<std::string> UnixFileSelectorUI::run() {
                 cmdProcessor.processImmediateInput(key);
             }
         } catch (std::invalid_argument &e) {
+            command_buffer.clear();
             error_message = e.what();
+            termMgr.setRawMode();
         } catch (std::runtime_error &e) {
+            command_buffer.clear();
             error_message = e.what();
+            termMgr.setRawMode();
         }
     }
 

@@ -16,9 +16,9 @@ public:
     UIRenderer();
     void drawHeader(const std::string &currentDirectory,
                     const std::vector<std::string> &activeFilters,
-                    bool showHidden,
+                    bool isShowHidden,
                     const std::string &searchName,
-                    bool showHelp);
+                    bool isShowHelp, bool isShowSelected);
     void drawFileList(const std::vector<fs::directory_entry> &entries,
                       size_t cursor,
                       const std::set<fs::path> &selectedPaths);

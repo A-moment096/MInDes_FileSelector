@@ -1,17 +1,22 @@
 #include "UIRenderer.hpp"
 #ifdef __unix__
+#include <algorithm>
+#include <cstdio>
+#include <fstream>
+#include <iostream>
 UIRenderer::UIRenderer() {
 }
 
 void UIRenderer::drawHeader(const std::string &currentDirectory,
                             const std::vector<std::string> &activeFilters,
-                            bool showHidden,
+                            bool isShowHidden,
                             const std::string &searchName,
-                            bool isShowHint) {
+                            bool isShowHint, bool isShowSelected) {
 
     constexpr const auto header_style = fmt::emphasis::bold | fg(fmt::color::light_blue);
     constexpr const auto search_style = fmt::emphasis::italic | fg(fmt::color::sea_green);
-    const auto hidden_style = showHidden ? fg(fmt::color::light_green) : fg(fmt::color::light_pink);
+    const auto hidden_style = isShowHidden ? fg(fmt::color::light_green) : fg(fmt::color::light_pink);
+    const auto selected_style = isShowSelected ? fg(fmt::color::light_green) : fg(fmt::color::light_pink);
 
     if (isShowHint) {
         printQuickHelp();
@@ -20,13 +25,16 @@ void UIRenderer::drawHeader(const std::string &currentDirectory,
     }
     fmt::print(header_style, "📁 {}\n", currentDirectory);
 
-    std::string status_bar{};
+    std::string status_bar_1{};
+    std::string status_bar_2{};
     if (!searchName.empty()) {
-        status_bar += getSearchStatus(searchName);
+        status_bar_1 += getSearchStatus(searchName);
     }
-    status_bar += getFilterStatus(activeFilters);
-    status_bar += fmt::format(hidden_style, "[Show Hidden?: {}] ", showHidden ? "YES" : "No");
-    fmt::print("{}\n", status_bar);
+    status_bar_1 += getFilterStatus(activeFilters);
+    status_bar_2 += fmt::format(hidden_style, "[Show Hidden? : {}] ", isShowHidden ? "YES" : "N0");
+    status_bar_2 += fmt::format(selected_style, "[Show Selected? : {}] ", isShowSelected ? "YES" : "NO");
+    fmt::print("{}\n", status_bar_1);
+    fmt::print("{}\n", status_bar_2);
 }
 
 void UIRenderer::drawFileList(const std::vector<fs::directory_entry> &entries,
@@ -37,9 +45,11 @@ void UIRenderer::drawFileList(const std::vector<fs::directory_entry> &entries,
     constexpr const auto no_permission_style = fg(fmt::color::red);
     constexpr const auto time_style = fg(fmt::color::pale_golden_rod);
     constexpr const auto size_style = fg(fmt::color::royal_blue);
+    constexpr const auto type_style = fg(fmt::color::magenta);
 
     std::string item_bar;
     item_bar = fmt::format(file_style, "{:<7}  {}  {:<40}", "", "No", "File Name");
+    item_bar += fmt::format(type_style, " {:<7}", "Type");
     item_bar += fmt::format(time_style, " {:<12}", "Modify Time", "Size");
     item_bar += fmt::format(size_style, "  {}", "Size");
     fmt::print("{}\n", item_bar);
@@ -66,12 +76,26 @@ void UIRenderer::drawFileList(const std::vector<fs::directory_entry> &entries,
                 return "[✗] ";
             }
         };
+        auto getFormattedFileExtn = [type_style](const fs::directory_entry &entry) -> std::string {
+            constexpr const auto type_style = fg(fmt::color::magenta);
+            std::string formatted_extension;
+            if (entry.is_directory()) {
+                formatted_extension = fmt::format(type_style, "{:<7.{}s} ", "DIR", 7);
+            } else {
+                formatted_extension = entry.path().extension().string();
+                formatted_extension = formatted_extension.substr(1);
+                std::transform(formatted_extension.begin(), formatted_extension.end(), formatted_extension.begin(), ::toupper);
+                formatted_extension = fmt::format(type_style, "{:<7.{}s} ", formatted_extension, 7);
+            }
+            return formatted_extension;
+        };
 
         std::string entry_line;
         try {
             entry_line += i == cursor ? "▶ " : "  ";
             entry_line += selectedCheckBox();
             entry_line += getFormattedFileName(entry, i, has_permission);
+            entry_line += getFormattedFileExtn(entry);
             entry_line += getFormattedFileTime(entry);
             entry_line += getFormattedFileSize(entry);
         } catch (...) {
@@ -82,10 +106,6 @@ void UIRenderer::drawFileList(const std::vector<fs::directory_entry> &entries,
 }
 
 void UIRenderer::drawFooter(const std::set<fs::path> &selectedPaths, bool showSelected) {
-    // if (openFolderinRange) {
-    //     std::cout << "Can't open a directory in range mode\n";
-    //     openFolderinRange = false;
-    // }
     fmt::print("\nSelected: {} files\n", selectedPaths.size());
     if (showSelected) {
         for (auto &f : selectedPaths) {
@@ -117,8 +137,8 @@ std::string UIRenderer::getFormattedFileName(const fs::directory_entry &entry, s
         formatted_name += fmt::format(print_style, "❌ ");
     }
 
-    formatted_name += fmt::format(print_style, "{:2}  {:<40} ",
-                                  number + 1, entry.path().filename().string());
+    formatted_name += fmt::format(print_style, "{:2}  {:<40.{}s} ",
+                                  number + 1, entry.path().filename().string(), 40);
 
     return formatted_name;
 }
@@ -165,7 +185,7 @@ std::string UIRenderer::getFormattedFileSize(const fs::directory_entry &entry) {
             formatted_size += fmt::format(size_style, "{:.1f}{}", count, suffixes[choose_suffix]);
         }
     } else {
-        formatted_size += fmt::format(size_style, " - ");
+        formatted_size += fmt::format(size_style, "  -  ");
     }
     return formatted_size;
 }
@@ -201,46 +221,136 @@ void UIRenderer::drawHelp(bool fullHelp) {
     if (fullHelp) {
         printFullHelp();
         fullHelp = false;
-        fmt::print(fg(fmt::color::steel_blue) | fmt::emphasis::bold,
-                   "\nPress any key to continue...\n");
-        (void)getchar();
         fmt::print("\033[2J\033[H"); // Clear screen again
     }
 }
 
 void UIRenderer::printFullHelp() {
-    const auto title_style = fmt::emphasis::bold | fg(fmt::color::gold);
-    const auto section_style = fg(fmt::color::aqua) | fmt::emphasis::underline;
-    const auto warn_style = fg(fmt::color::orange) | fmt::emphasis::bold;
 
-    fmt::print(title_style, "\n{:-^80}\n", " HELP ");
-    fmt::print(section_style, "\nNavigation:\n");
-    fmt::print("  {:20} {}\n", "↑/k", "Move up");
-    fmt::print("  {:20} {}\n", "↓/j", "Move down");
-    fmt::print("  {:20} {}\n", "←/h/0", "Parent directory");
-    fmt::print("  {:20} {}\n", "→/l/Space", "[📁]: Enter directory");
-    fmt::print("  {:20} {}\n", "", "[📄]: Toggle file");
+    constexpr const auto title_style = fmt::emphasis::bold | fg(fmt::color::gold);
+    constexpr const auto section_style = fg(fmt::color::aqua) | fmt::emphasis::underline;
+    constexpr const auto subsection_style = fg(fmt::color::light_sky_blue) | fmt::emphasis::bold;
+    constexpr const auto param_style = fg(fmt::color::light_green);
+    constexpr const auto example_style = fg(fmt::color::light_gray) | fmt::emphasis::italic;
+    constexpr const auto note_style = fg(fmt::color::orange) | fmt::emphasis::italic;
+    constexpr const auto warn_style = fg(fmt::color::orange) | fmt::emphasis::bold;
 
-    fmt::print(section_style, "\nNumber Operation:\n");
-    fmt::print("  {:20} {}\n", "3+Enter", "[📁]: Enter directory");
-    fmt::print("  {:20} {}\n", "", "[📄]: Select by number");
-    fmt::print(warn_style, "{}\n", "Following two method won't enter directories");
-    fmt::print("  {:20} {}\n", "1-9+Enter", "Select a range of files");
-    fmt::print("  {:20} {}\n", "1-5,8+Enter", "Multiple selection");
+    const std::vector<std::string> contents{
+        // Title
+        "",
+        fmt::format(title_style, "{:-^80}", " HELP "),
 
-    fmt::print(section_style, "\nAdvanced:\n");
-    fmt::print("  {:20} {}\n", ":path", "Jump to path");
-    fmt::print("  {:20} {}\n", ":filter txt,cpp", "Set multiple filters");
-    fmt::print("  {:20} {}\n", "H", "Toggle hidden files");
+        // Navigation Section
+        "",
+        fmt::format(section_style, "[ Navigation & Movement ]"),
+        "",
+        fmt::format(subsection_style, "Basic Movement:"),
+        fmt::format("  {:<18} {}", "↑/k", "Move cursor up"),
+        fmt::format("  {:<18} {}", "↓/j", "Move cursor down"),
+        fmt::format("  {:<18} {}", "←/h/Backspace", "Go to parent directory"),
+        fmt::format("  {:<18} {}", "→/l/Space", "Enter directory (📁) / Toggle file (📄)"),
 
-    fmt::print(section_style, "\nAuxiliary:\n");
-    fmt::print("  {:20} {}\n", "q/Enter", "Finish selection");
-    fmt::print("  {:20} {}\n", "!", "Toggle quick help");
-    fmt::print("  {:20} {}\n", "?", "Print this full help");
+        // Selection Section
+        "",
+        fmt::format(section_style, "[ Selection Modes ]"),
+        "",
+        fmt::format("  {:<18} Press number to start selection mode", "Activation:"),
+        fmt::format("  {:<18} Confirm with <Enter>, cancel with <ESC>", "Completion:"),
+        "",
+        // fmt::format(subsection_style, "Number Mode (1-9):"),
+        fmt::format("  {:<18} Select files using:", "Usage:"),
+        fmt::format("    {:<16} - Single file (e.g., '3')", ""),
+        fmt::format("    {:<16} - Ranges (e.g., '1-5')", ""),
+        fmt::format("    {:<16} - Combinations (e.g., '1-3,5,7')", ""),
+        fmt::format(warn_style, "  {}", "Note: Directories cannot be multi-selected"),
 
-    fmt::print(title_style, "\n{:-^80}\n", "");
+        "",
+        fmt::format(section_style, "[ Command Mode (:) ]"),
+        "",
+        fmt::format("  {:<18} Press <:> to start command mode", "Activation:"),
+        fmt::format("  {:<18} Confirm with <Enter>, cancel with <ESC>", "Completion:"),
+        "",
+        fmt::format(subsection_style, "Path Navigation:"),
+        fmt::format("  {:<18} {}", ":<path>",
+                    "Jump to specified filesystem path"),
+        fmt::format(param_style, "  {:<18} {}", "  Parameters:",
+                    "Absolute path or relative path from current directory"),
+        fmt::format(example_style, "  {:<18} {}", "  Example:",
+                    ":~/documents  :../parent_dir  :/usr/local"),
+
+        "",
+        fmt::format(subsection_style, "Filter Operations:"),
+        fmt::format("  {:<18} {}", ":filter <extensions>",
+                    "Show files with specified extensions"),
+        fmt::format(param_style, "  {:<18} {}", "  Parameters:",
+                    "Comma/space-separated list of extensions"),
+        fmt::format(example_style, "  {:<18} {}", "  Example:",
+                    ":filter txt,cpp pdf  :filter "),
+        fmt::format(note_style, "  {:<18} {}", "  Note:",
+                    "Empty filter resets to show all file types"),
+
+        "",
+        fmt::format(subsection_style, "Search Operations:"),
+        fmt::format("  {:<18} {}", ":search <pattern>",
+                    "Search files by name/content"),
+        fmt::format(param_style, "  {:<18} {}", "  Parameters:",
+                    "Search string (case-insensitive)"),
+        fmt::format(example_style, "  {:<18} {}", "  Example:",
+                    ":search report2023  :search "),
+        fmt::format(note_style, "  {:<18} {}", "  Note:",
+                    "Empty search resets filtering"),
+        fmt::format(note_style, "  {:<18} {}", "  ",
+                    "Space will be part of searched name"),
+
+        "",
+        fmt::format(subsection_style, "Sort Operations:"),
+        fmt::format("  {:<18} {}", ":sort <criteria>",
+                    "Set sorting criteria hierarchy"),
+        fmt::format(param_style, "  {:<18} {}", "  Parameters:",
+                    "Comma/space-separated combination of:"),
+        fmt::format("    {:<16} {}", "", "dir   - Directories first"),
+        fmt::format("    {:<16} {}", "", "type  - File extension"),
+        fmt::format("    {:<16} {}", "", "name  - Alphabetical order"),
+        fmt::format("    {:<16} {}", "", "time  - Modification time"),
+        fmt::format("    {:<16} {}", "", "size  - File size"),
+        fmt::format(example_style, "  {:<18} {}", "  Example:",
+                    ":sort dir,name  :sort time"),
+
+        "",
+        fmt::format(subsection_style, "Display Settings:"),
+        fmt::format("  {:<18} {}", "H",
+                    "Toggle hidden files visibility"),
+        fmt::format("  {:<18} {}", "S",
+                    "Toggle selected files visibility"),
+
+        "",
+        fmt::format(subsection_style, "Other Commands:"),
+        fmt::format("  {:<18} {}", ":Q",
+                    "Finish file selection"),
+        fmt::format("  {:<18} {}", ":help",
+                    "Open this help"),
+        // Program Operations
+        "",
+        fmt::format(section_style, "[ Program Operations ]"),
+        fmt::format("  {:<18} {}", "q", "Finish file selection"),
+        fmt::format("  {:<18} {}", "!", "Toggle quick help"),
+        fmt::format("  {:<18} {}", "?", "Show full help"),
+
+        // Footer
+        fmt::format(title_style, "{:-^80}", "")};
+
+    FILE *pipe = popen("less -R", "w");
+    if (!pipe) {
+        throw std::runtime_error("Failed to open pipe to less.");
+    }
+
+    // Send output to less
+    for (const auto &line : contents) {
+        fprintf(pipe, "%s\n", line.c_str());
+    }
+
+    pclose(pipe);
 }
-
 void UIRenderer::printQuickHelp() {
     const auto title_style = fmt::emphasis::bold | fg(fmt::color::gold);
     fmt::print(title_style, "\n{:-^60}\n", " HELP ");

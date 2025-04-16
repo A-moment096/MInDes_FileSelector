@@ -8,7 +8,7 @@
 
 FileSystemManager::FileSystemManager(const fs::path &startDirectory,
                                      const std::vector<std::string> &filters)
-    : currentDirectory(expandTilde(fs::canonical(startDirectory))),
+    : currentDirectory(fs::canonical(expandTilde(startDirectory))),
       previousDirectory(currentDirectory), filters(filters) {}
 
 void FileSystemManager::refreshDirectory(bool is_show_hidden) {
@@ -39,12 +39,13 @@ void FileSystemManager::refreshDirectory(bool is_show_hidden) {
 }
 
 void FileSystemManager::setSortPolicy(const std::string &policy) {
-    sortPolicy = policy;
+    sortPolicy.clear();
+    commandStringParser(sortPolicy, policy);
 }
 
-void FileSystemManager::setFilters(const std::vector<std::string> &exts) {
-    filters = exts;
-    // Trigger a directory refresh if needed.
+void FileSystemManager::setFilters(const std::string &exts) {
+    filters.clear();
+    commandStringParser(filters, exts);
 }
 
 void FileSystemManager::search() {
@@ -83,6 +84,19 @@ bool FileSystemManager::matchesFilter(const fs::path &p) const {
     return std::find(filters.begin(), filters.end(), ext) != filters.end();
 }
 
+void FileSystemManager::commandStringParser(std::vector<std::string> &vector, const std::string &str) {
+    std::istringstream iss(str);
+    std::string token;
+    // Support splitting by commas (and possible spaces)
+    while (std::getline(iss, token, ',')) {
+        std::istringstream iss2(token);
+        std::string ext;
+        while (iss2 >> ext) {
+            vector.push_back(ext);
+        }
+    }
+}
+
 void FileSystemManager::sortEntries() {
     // Map of comparators.
     Comparator cmpDirFirst = [](const Entry &a, const Entry &b) {
@@ -111,9 +125,7 @@ void FileSystemManager::sortEntries() {
         {"size", cmpSize}};
 
     std::vector<Comparator> sorters;
-    std::istringstream ss(sortPolicy);
-    std::string token;
-    while (std::getline(ss, token, ',')) {
+    for (auto const &token : sortPolicy) {
         if (auto it = comparatorMap.find(token); it != comparatorMap.end()) {
             sorters.push_back(it->second);
         } else {
