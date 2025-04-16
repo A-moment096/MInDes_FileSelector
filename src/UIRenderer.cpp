@@ -1,5 +1,5 @@
 #include "UIRenderer.hpp"
-
+#ifdef __unix__
 UIRenderer::UIRenderer() {
 }
 
@@ -260,3 +260,4 @@ void UIRenderer::printQuickHelp() {
                ":", "!", "?", "q");
     fmt::print(title_style, "\n{:-^60}\n", "");
 }
+#endif // __unix__

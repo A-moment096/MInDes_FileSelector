@@ -265,10 +265,10 @@ std::string TerminalManager::getLineByChar() {
     restoreTerminal();
     return buffer;
 }
-#endif
 
 void TerminalManager::writeBuffer(std::string &buffer, size_t &cursor_pos, int ch) {
     buffer.insert(cursor_pos, 1, static_cast<char>(ch));
     std::cout << "\033[s" << buffer.substr(cursor_pos) << "\033[u" << static_cast<char>(ch) << std::flush;
     ++cursor_pos;
 }
+#endif

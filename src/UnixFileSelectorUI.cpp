@@ -1,4 +1,5 @@
 // UnixFileSelectorUI.cpp
+#ifdef __unix__
 #include "UnixFileSelectorUI.hpp"
 #include "CommandProcessor.hpp"
 #include "FileSystemManager.hpp"
@@ -15,8 +16,6 @@
 
 UnixFileSelectorUI::UnixFileSelectorUI(const std::string &start, const std::vector<std::string> &exts)
     : startPath(start), extensions(exts) {
-    // Nothing else is needed here;
-    // The individual components will be instantiated in run().
 }
 
 std::vector<std::string> UnixFileSelectorUI::run() {
@@ -88,3 +87,4 @@ std::vector<std::string> UnixFileSelectorUI::run() {
     }
     return selectedFiles;
 }
+#endif // __unix__

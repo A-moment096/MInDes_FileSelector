@@ -1,7 +1,7 @@
 // UnixFileSelectorUI.hpp
+#ifdef __unix__
 #pragma once
 #include "IFileSelectorUI.hpp"
-
 #include <string>
 #include <vector>
 
@@ -14,3 +14,4 @@ private:
     std::string startPath;
     std::vector<std::string> extensions;
 };
+#endif // __unix__

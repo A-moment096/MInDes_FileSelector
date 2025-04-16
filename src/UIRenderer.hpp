@@ -1,10 +1,11 @@
 // UIRenderer.hpp
+#ifdef __unix__
 #pragma once
 #include <array>
 #include <filesystem>
+#include <fmt/chrono.h>
 #include <fmt/color.h>
 #include <fmt/core.h>
-#include <fmt/chrono.h>
 #include <set>
 #include <string>
 #include <vector>
@@ -35,3 +36,4 @@ private:
     void printFullHelp();
     void printQuickHelp();
 };
+#endif // __unix__

@@ -1,4 +1,5 @@
 // FileSystemManager.hpp
+#ifdef __unix__
 #pragma once
 #include <algorithm>
 #include <filesystem>
@@ -45,3 +46,4 @@ private:
     Comparator combineComparators(const std::vector<Comparator> &comps);
     bool matchesFilter(const fs::path &p) const;
 };
+#endif // __unix__

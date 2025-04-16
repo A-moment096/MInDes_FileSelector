@@ -1,4 +1,5 @@
 // FileSystemManager.cpp
+#ifdef __unix__
 #include "FileSystemManager.hpp"
 #include <cstdlib>
 #include <fmt/core.h>
@@ -155,3 +156,4 @@ fs::path FileSystemManager::expandTilde(const fs::path &path) {
     }
     return path;
 }
+#endif // __unix__

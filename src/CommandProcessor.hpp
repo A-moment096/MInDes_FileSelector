@@ -1,6 +1,6 @@
 // CommandProcessor.hpp
+#ifdef __unix__
 #pragma once
-
 #include "FileSystemManager.hpp"
 #include "UIRenderer.hpp"
 #include <set>
@@ -49,3 +49,4 @@ private:
 
     std::vector<std::string> split_multi_delim(const std::string &input, const std::string &delims);
 };
+#endif // __unix__

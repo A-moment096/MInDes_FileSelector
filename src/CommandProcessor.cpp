@@ -1,4 +1,5 @@
 // CommandProcessor.cpp
+#ifdef __unix__
 #include "CommandProcessor.hpp"
 #include "KeyEnum.hpp"
 #include <algorithm>
@@ -210,3 +211,4 @@ std::vector<std::string> CommandProcessor::split_multi_delim(const std::string &
 
     return result;
 }
+#endif // __unix__

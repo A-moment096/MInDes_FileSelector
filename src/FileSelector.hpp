@@ -1,4 +1,5 @@
 // FileSelector.hpp
+#ifdef __unix__
 #pragma once
 #include "IFileSelectorUI.hpp"
 #include <memory>
@@ -12,3 +13,4 @@ public:
 private:
     std::unique_ptr<IFileSelectorUI> uiImpl;
 };
+#endif // __unix__

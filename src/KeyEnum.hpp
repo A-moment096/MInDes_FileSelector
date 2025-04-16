@@ -1,3 +1,5 @@
+#pragma once
+#ifdef __unix__
 enum Key {
     KEY_NULL = 0,
     KEY_ESC = 27,
@@ -19,3 +21,4 @@ enum Key {
     KEY_DELETE_LINE
     // Add more as needed
 };
+#endif // __unix__

@@ -52,7 +52,6 @@ public:
 
 private:
     fs::path currentDirectory;
-    fs::path previousDirectory;
     std::vector<std::string> filters;
 #ifdef __unix__
     // State management
@@ -71,6 +70,7 @@ private:
     bool isSortPolicyChanged = true;
     bool isFiltersChanged = false;
     bool showSelected = true;
+    fs::path previousDirectory;
     std::string searchName{};
 
     std::vector<std::string> runLinux() {

@@ -1,4 +1,5 @@
 // FileSelector.cpp
+#ifdef __unix__
 #include "FileSelector.hpp"
 #ifdef __unix__
 #include "UnixFileSelectorUI.hpp"
@@ -17,3 +18,4 @@ FileSelector::FileSelector(const std::string &start, const std::vector<std::stri
 std::vector<std::string> FileSelector::run() {
     return uiImpl->run();
 }
+#endif // __unix__
