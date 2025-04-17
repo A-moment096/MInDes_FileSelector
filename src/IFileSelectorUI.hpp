@@ -1,4 +1,3 @@
-// IFileSelectorUI.hpp
 #pragma once
 
 #include <string>

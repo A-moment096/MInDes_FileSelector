@@ -1,4 +1,3 @@
-// UnixFileSelectorUI.hpp
 #ifdef __unix__
 #pragma once
 #include "IFileSelectorUI.hpp"

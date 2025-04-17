@@ -1,6 +1,4 @@
-// FileSelector.hpp
 #pragma once
-#include "IFileSelectorUI.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -8,8 +6,12 @@
 class FileSelector {
 public:
     FileSelector(const std::string &start, const std::vector<std::string> &exts);
+    ~FileSelector();
+    FileSelector() = delete;
+
     std::vector<std::string> run();
 
 private:
-    std::unique_ptr<IFileSelectorUI> uiImpl;
+    class Impl;
+    std::unique_ptr<Impl> pImpl;
 };

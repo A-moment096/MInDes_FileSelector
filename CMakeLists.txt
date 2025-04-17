@@ -36,3 +36,5 @@ if(BUILD_EXECUTABLE)
     target_include_directories(FileSelectorApp PRIVATE src)
     target_link_libraries(FileSelectorApp PRIVATE fmt::fmt)
 endif()
+
+install(FILES src/FileSelector.hpp DESTINATION include)
