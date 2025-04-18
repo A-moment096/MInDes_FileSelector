@@ -2,6 +2,7 @@
 #ifdef _WIN32
 #pragma once
 #include "FileSelector.hpp"
+#include "IFileSelectorUI.hpp"
 #include <string>
 #include <vector>
 
