@@ -182,9 +182,13 @@ void UIRenderer::drawFooter(const std::set<fs::path> &selectedMultiPaths, bool s
 }
 
 void UIRenderer::drawFooter(const fs::path &selectedSinglePath, bool showSelected) {
-    fmt::print("\nSelected file: \n");
-    if (showSelected) {
-        fmt::print(" - {}\n", selectedSinglePath.filename().string());
+    if (selectedSinglePath.empty()) {
+        fmt::print("\nNo file selected\n");
+    } else {
+        fmt::print("\nSelected file: \n");
+        if (showSelected) {
+            fmt::print(" - {}\n", fs::canonical(selectedSinglePath).string());
+        }
     }
 }
 

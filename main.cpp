@@ -8,13 +8,13 @@ namespace fs = std::filesystem;
 
 int main() {
     std::vector<fs::path> files;
-    // try {
-    //     FileSelector selector("~", {"mindes", "txt"});
-    //     files = selector.selectMultipleFile();
-    // } catch (const std::exception &e) {
-    //     fmt::print("Error: {}\n", e.what());
-    //     return 1;
-    // }
+    try {
+        FileSelector selector("~", {"mindes", "txt"});
+        files = selector.selectMultipleFile();
+    } catch (const std::exception &e) {
+        fmt::print("Error: {}\n", e.what());
+        return 1;
+    }
 
     fs::path file;
     try {

@@ -259,8 +259,10 @@ void CommandProcessor::toggleSelectionAtIndexSingle(size_t index) {
     const auto &entry = entries[index];
     fs::path canonical = fs::canonical(entry.path());
     // Toggle selection: only one file can be selected
-
-    if (entry.is_regular_file()) {
+    
+    if (selectedSinglePath == canonical) {
+        selectedSinglePath.clear();
+    } else if (entry.is_regular_file()) {
         selectedSinglePath = canonical;
 
     } else if (entry.is_directory()) {
