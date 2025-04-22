@@ -39,7 +39,7 @@ void UIRenderer::drawHeader(const fs::path &currentDirectory,
 
 void UIRenderer::drawFileList(const std::vector<fs::directory_entry> &entries,
                               size_t cursor,
-                              const std::set<fs::path> &selectedPaths) {
+                              const std::set<fs::path> &selectedMultiPaths) {
     constexpr const auto dir_style = fg(fmt::color::deep_sky_blue);
     constexpr const auto file_style = fg(fmt::color::white);
     constexpr const auto no_permission_style = fg(fmt::color::red);
@@ -60,7 +60,7 @@ void UIRenderer::drawFileList(const std::vector<fs::directory_entry> &entries,
         bool is_selected = false;
 
         try {
-            is_selected = selectedPaths.count(fs::canonical(entry.path()));
+            is_selected = selectedMultiPaths.count(fs::canonical(entry.path()));
         } catch (...) {
             has_permission = false;
         }
@@ -105,10 +105,10 @@ void UIRenderer::drawFileList(const std::vector<fs::directory_entry> &entries,
     }
 }
 
-void UIRenderer::drawFooter(const std::set<fs::path> &selectedPaths, bool showSelected) {
-    fmt::print("\nSelected: {} files\n", selectedPaths.size());
+void UIRenderer::drawFooter(const std::set<fs::path> &selectedMultiPaths, bool showSelected) {
+    fmt::print("\nSelected: {} files\n", selectedMultiPaths.size());
     if (showSelected) {
-        for (auto &f : selectedPaths) {
+        for (auto &f : selectedMultiPaths) {
             fmt::print(" - {}\n", f.filename().string());
         }
     }

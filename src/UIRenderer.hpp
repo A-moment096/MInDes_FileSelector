@@ -21,8 +21,8 @@ public:
                     bool isShowHelp, bool isShowSelected);
     void drawFileList(const std::vector<fs::directory_entry> &entries,
                       size_t cursor,
-                      const std::set<fs::path> &selectedPaths);
-    void drawFooter(const std::set<fs::path> &selectedPaths, bool showSelected);
+                      const std::set<fs::path> &selectedMultiPaths);
+    void drawFooter(const std::set<fs::path> &selectedMultiPaths, bool showSelected);
     virtual void drawHelp(bool fullHelp);
 
 private:
