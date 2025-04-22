@@ -5,6 +5,8 @@
 #include "UIRenderer.hpp"
 #include <set>
 #include <string>
+#include <vector>
+namespace fs = std::filesystem;
 
 class CommandProcessor {
 public:
@@ -32,7 +34,7 @@ public:
     bool shouldQuit() const;
 
     // Access selected file paths.
-    const std::set<std::filesystem::path> &getSelectedPaths() const;
+    const std::set<fs::path> &getSelectedPaths() const;
 
     bool isShowHint{false};
     bool isShowHidden{false};
@@ -45,7 +47,7 @@ private:
     bool quit;
 
     // For simplicity, we store selected files in a set.
-    std::set<std::filesystem::path> selectedPaths;
+    std::set<fs::path> selectedPaths;
 
     std::vector<std::string> split_multi_delim(const std::string &input, const std::string &delims);
 };

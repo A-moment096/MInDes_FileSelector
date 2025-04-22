@@ -7,7 +7,7 @@
 UIRenderer::UIRenderer() {
 }
 
-void UIRenderer::drawHeader(const std::string &currentDirectory,
+void UIRenderer::drawHeader(const fs::path &currentDirectory,
                             const std::vector<std::string> &activeFilters,
                             bool isShowHidden,
                             const std::string &searchName,
@@ -23,7 +23,7 @@ void UIRenderer::drawHeader(const std::string &currentDirectory,
     } else {
         fmt::print(fg(fmt::color::dark_gray) | bg(fmt::color::light_gray), "Press '!' for floating help or '?' for full features\n");
     }
-    fmt::print(header_style, "📁 {}\n", currentDirectory);
+    fmt::print(header_style, "📁 {}\n", currentDirectory.string());
 
     std::string status_bar_1{};
     std::string status_bar_2{};

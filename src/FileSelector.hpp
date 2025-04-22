@@ -2,6 +2,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <filesystem>
+namespace fs = std::filesystem;
 
 class FileSelector {
 public:
@@ -11,10 +13,10 @@ public:
     FileSelector &operator=(FileSelector &&) = delete;
     FileSelector(FileSelector &&) = delete;
 
-    FileSelector(const std::string &start, const std::vector<std::string> &exts);
+    FileSelector(const fs::path &start, const std::vector<std::string> &exts);
     ~FileSelector();
-    
-    std::vector<std::string> run();
+
+    std::vector<fs::path> run();
 
 private:
     class Impl;

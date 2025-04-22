@@ -5,14 +5,17 @@
 #include "IFileSelectorUI.hpp"
 #include <string>
 #include <vector>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 class WindowsFileSelectorUI : public IFileSelectorUI {
 public:
-    WindowsFileSelectorUI(const std::string &start, const std::vector<std::string> &exts);
-    std::vector<std::string> run() override;
+    WindowsFileSelectorUI(const fs::path &start, const std::vector<std::string> &exts);
+    std::vector<fs::path> run() override;
 
 private:
-    std::string startPath;
+    fs::path startPath;
     std::vector<std::string> extensions;
 };
 #endif // _WIN32

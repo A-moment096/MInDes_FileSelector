@@ -14,7 +14,7 @@ namespace fs = std::filesystem;
 class UIRenderer {
 public:
     UIRenderer();
-    void drawHeader(const std::string &currentDirectory,
+    void drawHeader(const fs::path &currentDirectory,
                     const std::vector<std::string> &activeFilters,
                     bool isShowHidden,
                     const std::string &searchName,

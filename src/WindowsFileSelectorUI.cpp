@@ -3,16 +3,19 @@
 #include "WindowsFileSelectorUI.hpp"
 
 #include <algorithm>
+#include <filesystem>
+#include <vector>
+
 #include <windows.h>
 
 #include <fmt/color.h>
 #include <fmt/core.h>
 
-WindowsFileSelectorUI::WindowsFileSelectorUI(const std::string &start, const std::vector<std::string> &exts)
+WindowsFileSelectorUI::WindowsFileSelectorUI(const fs::path &start, const std::vector<std::string> &exts)
     : startPath(start), extensions(exts) {
 }
 
-std::vector<std::string> WindowsFileSelectorUI::run() {
+std::vector<fs::path> WindowsFileSelectorUI::run() {
     // Allocate large buffer to hold multiple file names
     const DWORD bufferSize = 65536; // 64 KB
     char *szBuffer = new char[bufferSize];
@@ -20,7 +23,7 @@ std::vector<std::string> WindowsFileSelectorUI::run() {
 
     OPENFILENAMEA ofn = {0};
     ofn.lStructSize = sizeof(ofn);
-    auto initial_directory_path = startPath.c_str();
+    auto initial_directory_path = startPath.string().c_str();
     ofn.lpstrInitialDir = initial_directory_path;
 
     std::string filter{};
@@ -45,7 +48,7 @@ std::vector<std::string> WindowsFileSelectorUI::run() {
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_EXPLORER |
                 OFN_NOCHANGEDIR | OFN_ALLOWMULTISELECT;
 
-    std::vector<std::string> selectedFiles;
+    std::vector<fs::path> selectedFiles;
 
     if (GetOpenFileNameA(&ofn)) {
         char *p = szBuffer;

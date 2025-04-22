@@ -8,17 +8,21 @@
 #include "UIRenderer.hpp"
 
 #include <chrono>
-#include <fmt/color.h>
-#include <fmt/core.h>
+#include <filesystem>
 #include <iostream>
 #include <sstream>
+
 #include <unistd.h> // for STDIN_FILENO
 
-UnixFileSelectorUI::UnixFileSelectorUI(const std::string &start, const std::vector<std::string> &exts)
+#include <fmt/color.h>
+#include <fmt/core.h>
+
+namespace fs = std::filesystem;
+UnixFileSelectorUI::UnixFileSelectorUI(const fs::path &start, const std::vector<std::string> &exts)
     : startPath(start), extensions(exts) {
 }
 
-std::vector<std::string> UnixFileSelectorUI::run() {
+std::vector<fs::path> UnixFileSelectorUI::run() {
     // Create instances of our components.
     FileSystemManager fsManager(startPath, extensions);
     UIRenderer uiRenderer;
@@ -85,9 +89,9 @@ std::vector<std::string> UnixFileSelectorUI::run() {
     termMgr.restoreTerminal();
 
     // Prepare the result: convert each selected fs::path into a std::string.
-    std::vector<std::string> selectedFiles;
+    std::vector<fs::path> selectedFiles;
     for (const auto &path : cmdProcessor.getSelectedPaths()) {
-        selectedFiles.push_back(path.string());
+        selectedFiles.push_back(path);
     }
     return selectedFiles;
 }
