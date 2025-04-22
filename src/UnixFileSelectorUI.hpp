@@ -10,7 +10,8 @@ namespace fs = std::filesystem;
 class UnixFileSelectorUI : public IFileSelectorUI {
 public:
     UnixFileSelectorUI(const fs::path &start, const std::vector<std::string> &exts);
-    std::vector<fs::path> run() override;
+    std::vector<fs::path> selectMultipleFile() override;
+    fs::path selectSingleFile() override;
 
 private:
     fs::path startPath;

@@ -20,9 +20,12 @@ public:
 #endif
     }
 
-    std::vector<fs::path> run() {
-        return ui->run();
+    std::vector<fs::path> selectMultipleFile() {
+        return ui->selectMultipleFile();
     }
+    fs::path selectSingleFile() {
+        return ui->selectSingleFile();
+    };
 
 private:
     std::unique_ptr<IFileSelectorUI> ui;
@@ -33,6 +36,9 @@ FileSelector::FileSelector(const fs::path &start, const std::vector<std::string>
 
 FileSelector::~FileSelector() = default;
 
-std::vector<fs::path> FileSelector::run() {
-    return pImpl->run();
+std::vector<fs::path> FileSelector::selectMultipleFile() {
+    return pImpl->selectMultipleFile();
+}
+fs::path FileSelector::selectSingleFile() {
+    return pImpl->selectSingleFile();
 }

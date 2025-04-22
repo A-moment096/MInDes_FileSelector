@@ -16,7 +16,8 @@ public:
     FileSelector(const fs::path &start, const std::vector<std::string> &exts);
     ~FileSelector();
 
-    std::vector<fs::path> run();
+    std::vector<fs::path> selectMultipleFile();
+    fs::path selectSingleFile();
 
 private:
     class Impl;

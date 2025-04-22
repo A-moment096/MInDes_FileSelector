@@ -10,7 +10,7 @@ int main() {
     std::vector<fs::path> files;
     try {
         FileSelector selector("~", {"mindes", "txt"});
-        files = selector.run();
+        files = selector.selectMultipleFile();
     } catch (const std::exception &e) {
         fmt::print("Error: {}\n", e.what());
         return 1;

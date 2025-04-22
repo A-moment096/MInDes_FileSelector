@@ -22,7 +22,7 @@ UnixFileSelectorUI::UnixFileSelectorUI(const fs::path &start, const std::vector<
     : startPath(start), extensions(exts) {
 }
 
-std::vector<fs::path> UnixFileSelectorUI::run() {
+std::vector<fs::path> UnixFileSelectorUI::selectMultipleFile() {
     // Create instances of our components.
     FileSystemManager fsManager(startPath, extensions);
     UIRenderer uiRenderer;

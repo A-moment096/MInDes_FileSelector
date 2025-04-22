@@ -15,7 +15,7 @@ WindowsFileSelectorUI::WindowsFileSelectorUI(const fs::path &start, const std::v
     : startPath(start), extensions(exts) {
 }
 
-std::vector<fs::path> WindowsFileSelectorUI::run() {
+std::vector<fs::path> WindowsFileSelectorUI::selectMultipleFile() {
     // Allocate large buffer to hold multiple file names
     const DWORD bufferSize = 65536; // 64 KB
     char *szBuffer = new char[bufferSize];
