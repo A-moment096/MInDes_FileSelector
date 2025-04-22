@@ -114,12 +114,12 @@ fs::path UnixFileSelectorUI::selectSingleFile() {
         uiRenderer.drawHeader(fsManager.getCurrentDirectory().string(), fsManager.getFilters(),
                               cmdProcessor.isShowHidden, fsManager.searchName, cmdProcessor.isShowHint, cmdProcessor.isShowSelected);
         uiRenderer.drawFileList(fsManager.getEntries(), cmdProcessor.getCursor(),
-                                cmdProcessor.getSelectedMultiPaths());
+                                cmdProcessor.getSelectedSinglePath());
         if (!error_message.empty()) {
             fmt::print(fg(fmt::color::purple), "\n{}", error_message);
             error_message.clear();
         }
-        uiRenderer.drawFooter(cmdProcessor.getSelectedMultiPaths(), cmdProcessor.isShowSelected);
+        uiRenderer.drawFooter(cmdProcessor.getSelectedSinglePath(), cmdProcessor.isShowSelected);
         // Wait for a key press.
         int key = termMgr.readKey();
         try {

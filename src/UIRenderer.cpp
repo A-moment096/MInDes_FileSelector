@@ -104,6 +104,73 @@ void UIRenderer::drawFileList(const std::vector<fs::directory_entry> &entries,
         fmt::print("{}\n", entry_line);
     }
 }
+void UIRenderer::drawFileList(const std::vector<fs::directory_entry> &entries,
+                              size_t cursor,
+                              const fs::path &selectedSinglePath) {
+    constexpr const auto dir_style = fg(fmt::color::deep_sky_blue);
+    constexpr const auto file_style = fg(fmt::color::white);
+    constexpr const auto no_permission_style = fg(fmt::color::red);
+    constexpr const auto time_style = fg(fmt::color::pale_golden_rod);
+    constexpr const auto size_style = fg(fmt::color::royal_blue);
+    constexpr const auto type_style = fg(fmt::color::magenta);
+
+    std::string item_bar;
+    item_bar = fmt::format(file_style, "{:<7}  {}  {:<40}", "", "No", "File Name");
+    item_bar += fmt::format(type_style, " {:<7}", "Type");
+    item_bar += fmt::format(time_style, " {:<12}", "Modify Time", "Size");
+    item_bar += fmt::format(size_style, "  {}", "Size");
+    fmt::print("{}\n", item_bar);
+
+    for (size_t i = 0; i < entries.size(); ++i) {
+        bool has_permission = true;
+        const auto &entry = entries[i];
+        bool is_selected = false;
+
+        try {
+            is_selected = (selectedSinglePath == entry.path());
+        } catch (...) {
+            has_permission = false;
+        }
+
+        auto selectedCheckBox = [is_selected, has_permission]() -> std::string {
+            if (has_permission) {
+                if (is_selected) {
+                    return "[✓] ";
+                } else {
+                    return "[ ] ";
+                }
+            } else {
+                return "[✗] ";
+            }
+        };
+        auto getFormattedFileExtn = [type_style](const fs::directory_entry &entry) -> std::string {
+            constexpr const auto type_style = fg(fmt::color::magenta);
+            std::string formatted_extension;
+            if (entry.is_directory()) {
+                formatted_extension = fmt::format(type_style, "{:<7.{}s} ", "DIR", 7);
+            } else {
+                formatted_extension = entry.path().extension().string();
+                formatted_extension = formatted_extension.substr(1);
+                std::transform(formatted_extension.begin(), formatted_extension.end(), formatted_extension.begin(), ::toupper);
+                formatted_extension = fmt::format(type_style, "{:<7.{}s} ", formatted_extension, 7);
+            }
+            return formatted_extension;
+        };
+
+        std::string entry_line;
+        try {
+            entry_line += i == cursor ? "▶ " : "  ";
+            entry_line += selectedCheckBox();
+            entry_line += getFormattedFileName(entry, i, has_permission);
+            entry_line += getFormattedFileExtn(entry);
+            entry_line += getFormattedFileTime(entry);
+            entry_line += getFormattedFileSize(entry);
+        } catch (...) {
+        }
+
+        fmt::print("{}\n", entry_line);
+    }
+}
 
 void UIRenderer::drawFooter(const std::set<fs::path> &selectedMultiPaths, bool showSelected) {
     fmt::print("\nSelected: {} files\n", selectedMultiPaths.size());
@@ -111,6 +178,13 @@ void UIRenderer::drawFooter(const std::set<fs::path> &selectedMultiPaths, bool s
         for (auto &f : selectedMultiPaths) {
             fmt::print(" - {}\n", f.filename().string());
         }
+    }
+}
+
+void UIRenderer::drawFooter(const fs::path &selectedSinglePath, bool showSelected) {
+    fmt::print("\nSelected file: \n");
+    if (showSelected) {
+        fmt::print(" - {}\n", selectedSinglePath.filename().string());
     }
 }
 

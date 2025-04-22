@@ -22,7 +22,11 @@ public:
     void drawFileList(const std::vector<fs::directory_entry> &entries,
                       size_t cursor,
                       const std::set<fs::path> &selectedMultiPaths);
+    void drawFileList(const std::vector<fs::directory_entry> &entries,
+                      size_t cursor,
+                      const fs::path &selectedSinglePath);
     void drawFooter(const std::set<fs::path> &selectedMultiPaths, bool showSelected);
+    void drawFooter(const fs::path &selectedSinglePath, bool showSelected);
     virtual void drawHelp(bool fullHelp);
 
 private:
