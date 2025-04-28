@@ -24,8 +24,6 @@ void CommandProcessor::processImmediateInput(int key) {
         cursor = 0;
         break;
     case KEY_ARROW_RIGHT:
-    case '\n':
-    case '\r':
     case 'l':
     case ' ': {
         const auto &entries = fsManager.getEntries();
@@ -49,8 +47,9 @@ void CommandProcessor::processImmediateInput(int key) {
         moveCursor(1);
         break;
     case 'q':
+    case '\n':
+    case '\r':
         quit = true;
-
         break;
     case '!':
         isShowHint = !isShowHint;
@@ -81,8 +80,6 @@ void CommandProcessor::processImmediateInputSingle(int key) {
         cursor = 0;
         break;
     case KEY_ARROW_RIGHT:
-    case '\n':
-    case '\r':
     case 'l':
     case ' ': {
         const auto &entries = fsManager.getEntries();
@@ -106,8 +103,9 @@ void CommandProcessor::processImmediateInputSingle(int key) {
         moveCursor(1);
         break;
     case 'q':
+    case '\n':
+    case '\r':
         quit = true;
-
         break;
     case '!':
         isShowHint = !isShowHint;
@@ -259,7 +257,7 @@ void CommandProcessor::toggleSelectionAtIndexSingle(size_t index) {
     const auto &entry = entries[index];
     fs::path canonical = fs::canonical(entry.path());
     // Toggle selection: only one file can be selected
-    
+
     if (selectedSinglePath == canonical) {
         selectedSinglePath.clear();
     } else if (entry.is_regular_file()) {
